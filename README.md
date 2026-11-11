@@ -43,7 +43,7 @@ Resolved stack (from `uv.lock`):
 Package layout:
 
 - `src/semseg/`: the package. `semseg.config.load_config` reads `config.yaml`.
-- `config.yaml`: the pipeline config. Keys: `share_root` (the data folder, see below) and `aois` (the pilot AOI IDs).
+- `config.yaml`: the pipeline config. Keys: `share_root` (the data folder, see below), `aois` (the pilot AOI IDs), `segment` and `demo` (task 1.2).
 - `semseg.standard`: the data standard in code (see below).
 - `semseg._independence`: the scanner for D3 and R4. It finds imports of the `usace-landuse` code (`fine_grid`, `usace_veg`) in the source and in `pyproject.toml`.
 - `tests/`: the pytest suite.
@@ -55,7 +55,7 @@ Dated notes (2026-11-11):
 
 ## Data standard in code
 
-`semseg.standard` holds the data standard (`docs/DATA_STANDARD.md`, version 3). It has one pure
+`semseg.standard` holds the data standard (`docs/DATA_STANDARD.md`, version 4). It has one pure
 function or constant for each DS rule. It does no file access and no storage (task 0.3).
 
 Main names:
@@ -72,7 +72,7 @@ Dated notes (2026-11-11):
 
 - Grid math is exact (`int` or `Fraction`). Bounds off the 30 m lattice raise `ValueError`.
 - Share sums round to 9 decimals before each limit (D34).
-- D27 to D45 are `Draft (factory):` decisions. Jack reviews them.
+- D27 to D50 are `Draft (factory):` decisions. Jack reviews them.
 
 ## Chunk grid
 
@@ -125,3 +125,26 @@ Set-up check (`semseg.setup_check`, 2026-11-11):
 - Each run writes `results/setup_check.json`. A failed check sets `pass` to `false` and gives the `reason` (D40).
 - Exit codes: 0 = pass, 1 = other failure, 3 = share missing.
 - Last result (2026-11-11): `pass` true. NAIP 2022 chunks: 157 for 77 and 227 for 392, total 384 (D35).
+
+## SAM 2 polygons (`semseg.segment`, task 1.2, 2026-11-11)
+
+`semseg.segment` makes polygons from NAIP chunks with SAM 2. The model sits behind a `MaskModel` interface. The `samgeo` adapter is one implementation. The tests use a fake model.
+
+Warning: Do not run the command until Jack says run (D22). It loads the real model and downloads the weights.
+
+Command (only after Jack says run):
+
+```
+uv run python -m semseg.segment --demo --run
+```
+
+- The `--run` flag is required. Abbreviations such as `--ru` are refused with exit code 2. Without `--run`, the command loads nothing.
+- Before any model load, the code calls `ensure_hf_home()` (D38) and reads the available memory (`free -m`). If the value is below `segment.min_free_mb` (16000 MB in `config.yaml`), it exits with code 4 and loads nothing (D47, 2026-11-11).
+- The floor is 8000 MB (`MIN_FREE_FLOOR_MB`). A lower `min_free_mb` is a config error (D50, 2026-11-11).
+- A run refuses to start when `<semseg>/runs/<run_id>/` exists (D49, 2026-11-11). Wait one minute, or use another method suffix, for a new run ID.
+- Outputs:
+  - `<semseg>/<pid>_<NAME>/polygons/<chunk>.gpkg`, layer `polygons`. The IDs follow DS-9. The layer metadata follows DS-21.
+  - `<semseg>/runs/<run_id>/log.json`. It has the time, the memory and GPU state before and after, the `fake` flag and `log_errors`.
+- The demo uses 6 chunks of pilot 77. The list is `demo.chunks` in `config.yaml` (D46, 2026-11-11).
+- The Hugging Face hub writes the SAM 2 weights to `HF_HOME/hub` on the share. This is the only write that does not use `safe_write` (D48, 2026-11-11; data standard version 4).
+- The test suite never loads the real model. `tests/conftest.py` blocks the model classes and the Hugging Face download functions (FM-71).

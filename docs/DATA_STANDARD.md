@@ -1,6 +1,6 @@
 # Data standard
 
-Version 3 (2026-11-11). All stages of this repository obey these rules. The data registry is
+Version 4 (2026-11-11). All stages of this repository obey these rules. The data registry is
 [`data/REGISTRY.toml`](../data/REGISTRY.toml). Check it with:
 
 ```bash
@@ -99,10 +99,10 @@ Annual NLCD Collection 1 (USGS, MRLC), and `usace-landuse` `scheme.py` for USACE
 |---|---|---|
 | DS-23 | Roots (see `[roots]` in the registry): `semseg` (the share folder of this project, read and write), `fgt` (`fine_grid_test`, read only), `stack` (the `usace-landuse` stack, read only). | the write function refuses a path under a read-only root |
 | DS-24 | Large data (images, polygons, cell tables, rasters, model weights, caches) goes only under `semseg`. The repository keeps code, the configuration, the docs, and small results. | `git ls-files` has no file larger than 1 MB |
-| DS-25 | A write to the share goes to a local temporary file first, then a copy to a new file `<name>.<8 hex>.part` in the target folder (unique name, created with `O_EXCL` and `O_NOFOLLOW`), then `os.replace`. The code removes its own part file on an error and checks the share again right before the replace. | the writer test |
+| DS-25 | A write to the share goes to a local temporary file first, then a copy to a new file `<name>.<8 hex>.part` in the target folder (unique name, created with `O_EXCL` and `O_NOFOLLOW`), then `os.replace`. The code removes its own part file on an error and checks the share again right before the replace. Exception: the Hugging Face hub writes model weights into `HF_HOME/hub` (DS-28) with its own `.incomplete` file and an atomic rename; this is the only write that does not use `safe_write` (D48). | the writer test |
 | DS-26 | If a root does not exist (the share is not mounted), the step stops with exit code 3. It never writes the data in a different place. | the share-guard test |
 | DS-27 | The app database is SQLite at `var/app.sqlite` on the local disk (SQLite is not safe on SMB). Each night, and on each admin request, the app exports the labels to `semseg/<pid>_<NAME>/labels/`. | the export test |
-| DS-28 | Model weights and the Hugging Face cache are in `semseg/models/` (`HF_HOME`). | the set-up check prints `HF_HOME` |
+| DS-28 | Model weights and the Hugging Face cache are in `semseg/models/` (`HF_HOME`). The code calls `ensure_hf_home` and `guard_share` before any download, and the hub is the only writer of `semseg/models/hub/` (D48). | the set-up check prints `HF_HOME` |
 
 ## 6. Change log
 
@@ -111,3 +111,4 @@ Annual NLCD Collection 1 (USGS, MRLC), and `usace-landuse` `scheme.py` for USACE
 | 1 | 2026-11-11 | first version, from the plan interview ([D5](../DECISIONS.md), [D6](../DECISIONS.md)) |
 | 2 | 2026-11-11 | Draft (factory), task 0.2: level-1 wetland code 99; derived NLCD list; near shades for 25, 26, 28; name of 21; NLCD 250 → 0 ([D27](../DECISIONS.md)). DS-14 and DS-15 version 2: no photo, ties, leaf type, T < 0.10, exact limits ([D28](../DECISIONS.md)); in DS-15, I ≥ 0.20 → M02 before the tree classes ([D33](../DECISIONS.md)). DS-16 raster codes and flags; new column usace_m_flags ([D29](../DECISIONS.md)). Floor and exact lattice check in DS-3, DS-4, DS-8 ([D30](../DECISIONS.md)). DS-6 registry {pid}; DS-22 baselines and chunks.parquet ([D31](../DECISIONS.md)). DS-20 share columns and top_code ([D32](../DECISIONS.md)). Fix round: DS-10 pattern is `\A[0-9]{8}-[0-9]{4}-[a-z0-9_]+\Z` for a full match, with a real date and time; DS-14, DS-15 and DS-20 round each group share sum to 9 decimals ([D34](../DECISIONS.md)). DS-25 unique part name `<name>.<8 hex>.part`, `O_EXCL`, `O_NOFOLLOW`, guard again before the replace ([D39](../DECISIONS.md)). |
 | 3 | 2026-11-11 | Draft (factory), task 1.1: chunk list rule in DS-3 (positive area inside the footprint buffered by 150 m; an edge touch is out) ([D44](../DECISIONS.md)); `chunks.parquet` schema in DS-22 ([D43](../DECISIONS.md)). DS-21: `code_version` is the full SHA plus `-dirty`; the writer stops when git fails ([D45](../DECISIONS.md)). |
+| 4 | 2026-11-11 | Draft (factory), task 1.2: DS-25 exception for the Hugging Face hub write of model weights; DS-28 order of `ensure_hf_home` and `guard_share` before a download ([D48](../DECISIONS.md)). |

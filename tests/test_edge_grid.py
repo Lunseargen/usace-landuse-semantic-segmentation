@@ -287,7 +287,7 @@ def test_edge_parquet_metadata_has_every_key_with_a_value(tmp_path):
     meta = pq.read_schema(path).metadata
     for key in standard.METADATA_KEYS:
         assert meta[key.encode()].decode().strip()
-    assert meta[b"data_standard"] == b"3" and meta[b"naip_year"] == b"2022"
+    assert meta[b"data_standard"] == b"4" and meta[b"naip_year"] == b"2022"
     standard.check_run_id(meta[b"run_id"].decode())
     assert meta[b"sources"] == b"stack/5_X/boundary.gpkg"
     assert b"pandas" in meta                                           # pandas schema metadata kept

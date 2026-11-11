@@ -1,4 +1,6 @@
 """Load config.yaml from the repository root."""
+import math
+import re
 from pathlib import Path
 
 import yaml
@@ -26,6 +28,45 @@ class _UniqueLoader(yaml.SafeLoader):
         return super().construct_mapping(node, deep)
 
 
+_CHUNK = re.compile(r"r(?:0|[1-9][0-9]*)_c(?:0|[1-9][0-9]*)", re.ASCII)
+MIN_FREE_FLOOR_MB = 8000  # D50: the lowest allowed `segment.min_free_mb` (the memory stop cannot be off)
+_NUMBERS = ("simplify_tolerance_m", "min_area_m2")
+
+
+def non_negative_number(value):
+    """True for a finite int or float (not a bool) that is 0 or more."""
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value >= 0)
+
+
+def _check_segment(path, seg):
+    """Check the optional `segment` section (D47). A missing key is allowed."""
+    if not isinstance(seg, dict):
+        raise ConfigError(f"{path}: segment must be a mapping")
+    free = seg.get("min_free_mb", MIN_FREE_FLOOR_MB)
+    if type(free) is not int or free < MIN_FREE_FLOOR_MB:
+        raise ConfigError(f"{path}: segment.min_free_mb must be an integer of {MIN_FREE_FLOOR_MB} or more (D50)")
+    for key in _NUMBERS:
+        if key in seg and not non_negative_number(seg[key]):
+            raise ConfigError(f"{path}: segment.{key} must be a finite number of 0 or more")
+    model = seg.get("model_id", "x")
+    if not isinstance(model, str) or not model.strip():
+        raise ConfigError(f"{path}: segment.model_id must be a non-empty string")
+
+
+def _check_demo(path, demo):
+    """Check the optional `demo` section (D46)."""
+    if not isinstance(demo, dict):
+        raise ConfigError(f"{path}: demo must be a mapping")
+    pid, chunks = demo.get("pid"), demo.get("chunks")
+    if type(pid) is not int or pid < 1:
+        raise ConfigError(f"{path}: demo.pid must be an integer of 1 or more")
+    if (not isinstance(chunks, list) or not chunks
+            or any(not isinstance(c, str) or _CHUNK.fullmatch(c) is None for c in chunks)
+            or len(set(chunks)) != len(chunks)):
+        raise ConfigError(f"{path}: demo.chunks must be a non-empty list of unique chunk IDs")
+
+
 def _check(path, data):
     if not isinstance(data, dict):
         raise ConfigError(f"{path}: the top level must be a mapping")
@@ -39,6 +80,10 @@ def _check(path, data):
     if (not isinstance(aois, list) or not aois
             or any(type(a) is not int for a in aois)):
         raise ConfigError(f"{path}: aois must be a non-empty list of integers")
+    if "segment" in data:
+        _check_segment(path, data["segment"])
+    if "demo" in data:
+        _check_demo(path, data["demo"])
 
 
 def load_config(path=None):

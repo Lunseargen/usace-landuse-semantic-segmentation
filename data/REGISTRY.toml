@@ -194,8 +194,8 @@ title = "Run folders: one folder for each run, named by run_id (DS-22)"
 path = "{semseg}/runs/*/*"
 kind = "other"
 status = "planned"
-writer = "0.3"
-readers = ["1.2", "4.1"]
+writer = "1.2"
+readers = ["4.1"]
 standard = "DS-22"
 
 [[dataset]]

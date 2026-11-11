@@ -1,3 +1,15 @@
 # Project config (D23). Large data goes only under share_root.
 share_root: /run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data/usace-landuse-semseg
 aois: [77, 392]
+
+# Task 1.2 (D46, D47). SAM 2 run settings and the demo chunks of 77.
+segment:
+  min_free_mb: 16000          # stop with exit 4 if the available memory is less (D47)
+  simplify_tolerance_m: 0.5   # polygon simplify tolerance, metres
+  min_area_m2: 2              # smaller polygons are dropped (8 pixels of 0.5 m)
+  model_id: sam2-hiera-large
+demo:
+  pid: 77
+  # D46: the 6 rows of 77_GRAPEVINE_LAKE/chunks.parquet with the largest footprint_share
+  # (tie: lowest row, then lowest col). 8 chunks have share 1.0; the tie rule picks these 6.
+  chunks: [r2298_c2399, r2299_c2402, r2299_c2403, r2300_c2403, r2301_c2404, r2301_c2405]

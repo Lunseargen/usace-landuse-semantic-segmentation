@@ -11,6 +11,7 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
 - Run the task gate: `python3 ~/.claude/skills/build-task/scripts/gate.py`.
 - Write the chunk list of each pilot (task 1.1): `uv run python -m semseg.grid <pid> ...`.
 - Run the set-up check (read only, no GPU run): `uv run python -m semseg.setup_check`. Exit code 3 = the lab share is not mounted.
+- Run the SAM 2 polygons (task 1.2) (only after Jack says run): `uv run python -m semseg.segment --demo --run`.
 
 ## Rules (2026-11-11)
 
@@ -26,5 +27,6 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
 - Write data only through `semseg.storage` (share guard, read-only roots, safe write).
 - Do not start a GPU run (SAM 2, LangSAM, training) until the user says so (D22). The vLLM
   server holds about 97 GB of the 121 GB GB10 memory.
+- Do not run `python -m semseg.segment --run` until Jack says so (D22).
 - The web app uses the `vllmPortal` design (`~/workspace/vllmPortal/DESIGN.md`) and the login
   pattern of `USDA-LFD-LLM` `scripts/scrape/queue_server.py` (D16). No CDN: vendor each library.

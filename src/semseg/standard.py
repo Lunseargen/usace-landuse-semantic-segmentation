@@ -1,4 +1,4 @@
-"""The data standard (`docs/DATA_STANDARD.md`, version 3) in code.
+"""The data standard (`docs/DATA_STANDARD.md`, version 4) in code.
 
 Task 0.2. This module has pure functions and constants only. No function reads or writes a
 file. The storage code is task 0.3. A bad input raises `ValueError`. A function never rounds an
@@ -19,7 +19,7 @@ from numbers import Integral, Real
 from pathlib import PurePosixPath
 from typing import NamedTuple
 
-DATA_STANDARD_VERSION = 3
+DATA_STANDARD_VERSION = 4
 
 # ---------------------------------------------------------------- grid (DS-1 to DS-4, DS-7, DS-8)
 
