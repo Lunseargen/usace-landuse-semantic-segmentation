@@ -3,7 +3,8 @@
 The project plan. [`DECISIONS.md`](DECISIONS.md) has the decision log.
 [`docs/DATA_STANDARD.md`](docs/DATA_STANDARD.md) has the data rules (`DS-<n>`), and
 [`data/REGISTRY.toml`](data/REGISTRY.toml) has the location of each data set. `docs/stages/`
-has the notes of each finished stage.
+has the notes of each finished stage. [`docs/METHOD_v1.md`](docs/METHOD_v1.md) is a read-only
+copy of the `usace-landuse` method v1 (USACE-M classes, condition score, change categories).
 
 | Section | Tool | Question that it answers |
 |---|---|---|

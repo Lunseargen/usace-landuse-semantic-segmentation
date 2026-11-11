@@ -8,6 +8,12 @@ segment:
   simplify_tolerance_m: 0.5   # polygon simplify tolerance, metres
   min_area_m2: 2              # smaller polygons are dropped (8 pixels of 0.5 m)
   model_id: sam2-hiera-large
+# Task 1.3 (D51, D53). LangSAM text prompts and the prompt overlap rule.
+label:
+  model_id: sam2-hiera-large   # LangSAM model_type (same SAM 2 model as segment.model_id)
+  box_threshold: 0.25          # GroundingDINO box threshold (samgeo text_sam_gui default)
+  text_threshold: 0.25         # GroundingDINO text threshold (samgeo text_sam_gui default)
+  min_overlap: 0.5             # D53: smallest p_prompt that gives a code
 demo:
   pid: 77
   # D46: the 6 rows of 77_GRAPEVINE_LAKE/chunks.parquet with the largest footprint_share

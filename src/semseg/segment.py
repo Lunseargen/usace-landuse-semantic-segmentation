@@ -1,7 +1,8 @@
 """SAM 2 polygons for NAIP chunks (task 1.2, I1, I2, FM-6, FM-70 to FM-75, D46 to D48).
 
 Run (only after Jack says "run", D22):
-`uv run python -m semseg.segment --demo --run`
+`uv run python -m semseg.segment --demo --run` (the demo chunks of `config.yaml`), or
+`uv run python -m semseg.segment --pid 77 --run` (all chunks of `<semseg>/<folder>/chunks.parquet`, D59).
 
 Steps for each run: guard the share, set `HF_HOME`, check the available memory (exit 4 if less
 than `segment.min_free_mb`), load the model, then for each chunk read the NAIP file, make the
@@ -15,6 +16,7 @@ import argparse
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -24,6 +26,7 @@ from typing import Protocol
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import rasterio
 import shapely
 from rasterio import features
@@ -39,6 +42,8 @@ DEFAULT_MIN_AREA_M2 = 2.0
 DEFAULT_MODEL_ID = "sam2-hiera-large"
 FAKE_ENV = "SEMSEG_FAKE_MODEL"
 _POLYGONS = "polygons"
+NAIP_GSD = "0.6"  # D57: the source GSD of every NAIP chunk, in metres, as the file tag `gsd`
+_YEAR_RE = re.compile(r"[0-9]{4}", re.ASCII)
 
 
 class MaskModel(Protocol):
@@ -104,6 +109,7 @@ def _build_real_model(model_id):
     """Build the real model. It loads weights, so only the user's `--run` calls it (D22)."""
     from samgeo import SamGeo2  # imported here: importing semseg.segment must not import samgeo
 
+    storage.use_soft_hf_locks()  # D58: the share refuses FileLock
     return _Sam2Model(SamGeo2(model_id=model_id, device="cuda", automatic=True), model_id)
 
 
@@ -136,12 +142,37 @@ def load_sam2(roots, config, *, probe=None, loader=None, environ=None):
 
 # ---------------------------------------------------------------- I1 NAIP chunk
 
+def _check_gsd(src, path):
+    """D57: raise ValueError unless the tag `gsd` of the file is exactly "0.6" (the source GSD, DS-4)."""
+    gsd = src.tags().get("gsd")
+    if gsd != NAIP_GSD:
+        raise ValueError(f"{path}: the tag gsd must be {NAIP_GSD!r} (NAIP source GSD 0.6 m, D57), got {gsd!r}")
+
+
+def chunk_naip_year(path):
+    """Return the NAIP year of a chunk file as an int, from the tag `years` (D57, DS-5).
+
+    Raise FileNotFoundError for a missing file. Raise ValueError if the tag `gsd` is not "0.6", or
+    if `years` is missing or is not one 4-digit year (several years are refused). The call reads
+    the tags only, not the pixels.
+    """
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"no NAIP chunk file: {path}")
+    with rasterio.open(path) as src:
+        _check_gsd(src, path)
+        years = src.tags().get("years")
+    if not isinstance(years, str) or _YEAR_RE.fullmatch(years) is None:
+        raise ValueError(f"{path}: the tag years must be one 4-digit year (D57), got {years!r}")
+    return int(years)
+
+
 def read_chunk(path):
     """Read a NAIP chunk file. Return `(rgb uint8 (H, W, 3), transform, crs)`.
 
     Raise FileNotFoundError for a missing file. Raise ValueError if the profile is not I1
-    (EPSG:5070, 1920 x 1920, 0.5 m on the lattice, 3 or more uint8 bands) or if the file name does
-    not match the box of the file (DS-4, DS-7).
+    (EPSG:5070, 1920 x 1920, 0.5 m on the lattice, 3 or more uint8 bands), if the file name does
+    not match the box of the file (DS-4, DS-7), or if the tag `gsd` is missing or not "0.6" (D57).
     """
     path = Path(path)
     if not path.is_file():
@@ -156,6 +187,7 @@ def read_chunk(path):
         xmin, _, _, ymax = standard.chunk_bounds(row, col)
         if (src.transform.c, src.transform.f) != (xmin, ymax):
             raise ValueError(f"{path}: the file name does not match the box of the file")
+        _check_gsd(src, path)
         rgb = np.ascontiguousarray(src.read([1, 2, 3]).transpose(1, 2, 0))
         return rgb, src.transform, src.crs
 
@@ -281,12 +313,8 @@ def _check_frame(gdf, chunk, run_id):
             raise ValueError("every geometry must be a valid, non-empty Polygon inside the chunk box")
 
 
-def write_polygons(gdf, roots, folder, chunk, metadata):
-    """Write `<semseg>/<folder>/polygons/<chunk>.gpkg` (layer `polygons`, DS-21 in the layer metadata).
-
-    Every check runs before the first write. The file goes through `storage.safe_write`, so a
-    failure leaves no part file and keeps an old file whole (FM-74). Return the path.
-    """
+def check_polygon_file(gdf, folder, chunk, metadata):
+    """Raise ValueError unless the frame, the names and the DS-21 metadata are valid for a polygon file."""
     _check_metadata(metadata)
     standard.parse_project_folder(folder)
     standard.check_name(folder)
@@ -294,22 +322,40 @@ def write_polygons(gdf, roots, folder, chunk, metadata):
     if gdf.crs is None or gdf.crs.to_epsg() != 5070:
         raise ValueError(f"the CRS must be {standard.CRS}")
     _check_frame(gdf, chunk, metadata["run_id"])
-    target = Path(roots["semseg"]) / folder / _POLYGONS / f"{chunk}.gpkg"
+
+
+def polygon_path(roots, folder, chunk):
+    """Return `<semseg>/<folder>/polygons/<chunk>.gpkg`."""
+    return Path(roots["semseg"]) / folder / _POLYGONS / f"{chunk}.gpkg"
+
+
+def write_polygon_layer(gdf, roots, folder, chunk, layer_metadata):
+    """Write the frame as layer `polygons` with `layer_metadata`, through `storage.safe_write` (FM-74). Return the path."""
+    target = polygon_path(roots, folder, chunk)
     with tempfile.TemporaryDirectory(prefix="semseg_") as tmp:
         local = Path(tmp) / target.name
-        gdf.to_file(local, layer=_POLYGONS, driver="GPKG", engine="pyogrio",
-                    layer_metadata={key: metadata[key] for key in standard.METADATA_KEYS})
+        gdf.to_file(local, layer=_POLYGONS, driver="GPKG", engine="pyogrio", layer_metadata=layer_metadata)
         data = local.read_bytes()
     return storage.safe_write(target, data, roots)
 
 
+def write_polygons(gdf, roots, folder, chunk, metadata):
+    """Write `<semseg>/<folder>/polygons/<chunk>.gpkg` (layer `polygons`, DS-21 in the layer metadata).
+
+    Every check runs before the first write. The file goes through `storage.safe_write`, so a
+    failure leaves no part file and keeps an old file whole (FM-74). Return the path.
+    """
+    check_polygon_file(gdf, folder, chunk, metadata)
+    return write_polygon_layer(gdf, roots, folder, chunk, {key: metadata[key] for key in standard.METADATA_KEYS})
+
+
 def write_run_log(roots, run_id, *, model_id, fake, memory_before_mb, memory_after_mb, started,
                   finished, chunks, chunks_done, error=None, gpu_before=None, gpu_after=None,
-                  log_errors=()):
+                  log_errors=(), extra=None):
     """Write `<semseg>/runs/<run_id>/log.json` with `storage.safe_write`. Return the path.
 
     `fake` marks a fake model (FM-75). `log_errors` lists failed reads after the run (FM-77). The GPU values come from `setup_check.query_gpu` (they can
-    be `None` on the GB10, D37).
+    be `None` on the GB10, D37). `extra` is a mapping of more keys (task 1.3: `codes`, D54).
     """
     standard.check_run_id(run_id)
     text = json.dumps({
@@ -318,7 +364,7 @@ def write_run_log(roots, run_id, *, model_id, fake, memory_before_mb, memory_aft
         "gpu_before": gpu_before, "gpu_after": gpu_after,
         "started": started, "finished": finished,
         "chunks": list(chunks), "chunks_done": list(chunks_done), "error": error,
-        "log_errors": list(log_errors),
+        "log_errors": list(log_errors), **(extra or {}),
     }, indent=2, sort_keys=True)
     target = Path(roots["semseg"]) / "runs" / run_id / "log.json"
     return storage.safe_write(target, (text + "\n").encode("utf-8"), roots)
@@ -326,9 +372,9 @@ def write_run_log(roots, run_id, *, model_id, fake, memory_before_mb, memory_aft
 
 # ---------------------------------------------------------------- run
 
-def _metadata(run_id, folder, chunk, code_version, now):
+def _metadata(run_id, folder, chunk, code_version, now, naip_year):
     return {"run_id": run_id, "code_version": code_version,
-            "data_standard": str(standard.DATA_STANDARD_VERSION), "naip_year": str(grid.NAIP_YEAR),
+            "data_standard": str(standard.DATA_STANDARD_VERSION), "naip_year": str(naip_year),
             "sources": f"naip/{folder}/{chunk}.tif", "created": _utc_text(now)}
 
 
@@ -353,19 +399,37 @@ def run_chunks(chunks, model, roots, folder, config, *, run_id, probe, gpu_query
     standard.check_run_id(run_id)
     standard.parse_project_folder(folder)
     _refuse_existing_run(roots, run_id)
-    gpu_query = gpu_query or setup_check.query_gpu
-    started, memory_before, gpu_before = _utc_text(_now()), probe(), gpu_query()
-    done, paths, error, first = [], [], None, None
-    try:
+
+    def work(done):
+        paths = []
         code_version = grid._code_version()
         for chunk in chunks:
             row, col = standard.parse_chunk_id(chunk)
-            rgb, transform, _ = read_chunk(Path(roots["fgt"]) / folder / "naip" / f"{chunk}.tif")
+            naip = Path(roots["fgt"]) / folder / "naip" / f"{chunk}.tif"
+            rgb, transform, _ = read_chunk(naip)
+            naip_year = chunk_naip_year(naip)  # D57, DS-5: the year of the file, not a constant
             gdf = masks_to_polygons(model.generate(rgb), transform, standard.chunk_bounds(row, col),
                                     run_id, chunk, config)
-            meta = _metadata(run_id, folder, chunk, code_version, _now())
+            meta = _metadata(run_id, folder, chunk, code_version, _now(), naip_year)
             paths.append(write_polygons(gdf, roots, folder, chunk, meta))
             done.append(chunk)
+        return paths
+
+    return run_logged(roots, run_id, model, chunks, probe, gpu_query, work)
+
+
+def run_logged(roots, run_id, model, chunks, probe, gpu_query, work, extra=None):
+    """Run `work(done)` and write the run log on success and on a failure (FM-76, FM-77). Return its result.
+
+    `work` appends each finished chunk to the list `done`. The memory is read with `probe()` before
+    and after. `extra()` (optional) returns more log keys, read after the work (task 1.3: `codes`).
+    The first error stays the one raised; a failed read or a failed log write is chained or logged.
+    """
+    gpu_query = gpu_query or setup_check.query_gpu
+    started, memory_before, gpu_before = _utc_text(_now()), probe(), gpu_query()
+    done, result, error, first = [], None, None, None
+    try:
+        result = work(done)
     except BaseException as exc:  # FM-76: also KeyboardInterrupt goes in the log
         error, first = f"{type(exc).__name__}: {exc}", exc
         raise
@@ -384,13 +448,14 @@ def run_chunks(chunks, model, roots, folder, config, *, run_id, probe, gpu_query
             write_run_log(roots, run_id, model_id=model.model_id, fake=getattr(model, "fake", False),
                           memory_before_mb=memory_before, memory_after_mb=memory_after, started=started,
                           finished=_utc_text(_now()), chunks=chunks, chunks_done=done, error=error,
-                          gpu_before=gpu_before, gpu_after=gpu_after, log_errors=log_errors)
+                          gpu_before=gpu_before, gpu_after=gpu_after, log_errors=log_errors,
+                          extra=extra() if extra else None)
         except Exception as log_exc:
             if first is None:
                 raise  # no first error: the log error is the only one
             # The first error stays the one raised; the log error is chained as a note.
             first.add_note(f"the run log also failed: {type(log_exc).__name__}: {log_exc}")
-    return paths
+    return result
 
 
 # ---------------------------------------------------------------- D46 demo chunks and CLI
@@ -406,28 +471,57 @@ def select_demo_chunks(df, n=6):
 def _parser():
     parser = argparse.ArgumentParser(prog="python -m semseg.segment", description=__doc__.splitlines()[0],
                                      allow_abbrev=False)  # D50: `--ru` must not start a run
-    parser.add_argument("--demo", action="store_true", required=True,
-                        help="the demo chunks of config.yaml (demo.chunks)")
+    which = parser.add_mutually_exclusive_group(required=True)
+    which.add_argument("--demo", action="store_true",
+                       help="the demo chunks of config.yaml (demo.chunks)")
+    which.add_argument("--pid", type=int,
+                       help="all chunks of <semseg>/<pid>_<NAME>/chunks.parquet (D59)")
     parser.add_argument("--run", action="store_true",
                         help="really run: loads SAM 2 on the GPU (only after Jack says run, D22)")
     return parser
 
 
+def pilot_chunks(roots, folder):
+    """Return the chunk IDs of `<semseg>/<folder>/chunks.parquet` in file order (D59).
+
+    Raise FileNotFoundError if the file is missing, ValueError if it has no `chunk` column or no row.
+    """
+    path = Path(roots["semseg"]) / folder / standard.CHUNK_LIST
+    if not path.is_file():
+        raise FileNotFoundError(f"no chunk list: {path} (task 1.1 writes it)")
+    df = pd.read_parquet(path)
+    if "chunk" not in df.columns:
+        raise ValueError(f"{path}: no column `chunk`")
+    chunks = [str(chunk) for chunk in df["chunk"]]
+    if not chunks:
+        raise ValueError(f"{path}: the chunk list is empty")
+    return chunks
+
+
 def main(argv=None, roots=None, config=None, probe=None, loader=None, now=None):
-    """Run the demo chunks. Return 0. Without `--run` it exits with an error and loads nothing (D22)."""
+    """Run the demo chunks or all chunks of one pilot. Return 0.
+
+    Without `--run` it exits with an error and loads nothing (D22).
+    """
     parser = _parser()
     args = parser.parse_args(argv)
     if not args.run:
-        parser.error("--demo needs --run: nothing starts without --run (D22)")
+        flag = "--demo" if args.demo else "--pid"
+        parser.error(f"{flag} needs --run: nothing starts without --run (D22)")
     roots = storage.load_roots() if roots is None else roots
     config = load_config() if config is None else config
     storage.guard_share(roots)
     probe = probe or read_available_mb
     now = _now() if now is None else now
-    demo = config.get("demo") if isinstance(config, dict) else None
-    if not isinstance(demo, dict):
-        raise ValueError("config `demo` is missing or not a mapping (FM-84)")
-    folder = grid.find_folder(demo["pid"], roots)
+    if args.demo:
+        demo = config.get("demo") if isinstance(config, dict) else None
+        if not isinstance(demo, dict):
+            raise ValueError("config `demo` is missing or not a mapping (FM-84)")
+        folder = grid.find_folder(demo["pid"], roots)
+        chunks = demo["chunks"]
+    else:
+        folder = grid.find_folder(args.pid, roots)
+        chunks = pilot_chunks(roots, folder)
     run_id = standard.run_id(now, METHOD)
     _refuse_existing_run(roots, run_id)  # D49: before any write, also before the low-memory log
     started = _utc_text(now)
@@ -440,10 +534,10 @@ def main(argv=None, roots=None, config=None, probe=None, loader=None, now=None):
             memory = stop.available_mb
             write_run_log(roots, run_id, model_id=f"facebook/{_model_id(config)}", fake=False,
                           memory_before_mb=memory, memory_after_mb=memory, started=started,
-                          finished=_utc_text(_now()), chunks=demo["chunks"], chunks_done=[],
+                          finished=_utc_text(_now()), chunks=chunks, chunks_done=[],
                           error="not enough available memory (D47): nothing was loaded")
         raise
-    for path in run_chunks(demo["chunks"], model, roots, folder, config, run_id=run_id, probe=probe):
+    for path in run_chunks(chunks, model, roots, folder, config, run_id=run_id, probe=probe):
         print(path)
     return 0
 

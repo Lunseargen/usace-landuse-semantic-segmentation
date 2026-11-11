@@ -509,7 +509,7 @@ def test_edge_derived_outputs_all_have_colour_and_label():
     assert outs_top <= set(S.CODE_LIST)
 
 
-@pytest.mark.parametrize("code", [0, -1, 1, 12, 22.5, 99, 10, 250, None, "11", True, float("nan")])
+@pytest.mark.parametrize("code", [0, -1, 1, 15, 22.5, 99, 10, 250, None, "11", True, float("nan")])
 def test_edge_colour_rejects(code):
     with pytest.raises(ValueError):
         S.colour(code)
@@ -524,7 +524,7 @@ def test_edge_colour_hex_format_and_derived_shares_nlcd_legend():
     assert S.colour(np.int64(11)) == "#466b9f"
 
 
-@pytest.mark.parametrize("bad", [0, -1, 1, 12, 91, 100, 15, 55, None, "41", True, float("nan"),
+@pytest.mark.parametrize("bad", [0, -1, 1, 16, 91, 100, 15, 56, None, "41", True, float("nan"),
                                  22, 23, 24, 98, 60])
 def test_edge_level1_rejects(bad):
     with pytest.raises(ValueError):
@@ -734,7 +734,7 @@ def test_edge_shares_input_errors():
     for bad_shares in (None, [], [(11, 1.0)], "11", 5, np.array([1.0])):
         with pytest.raises(ValueError):
             S.derived_nlcd(bad_shares, 1.0)
-    for key in (0, 22, 23, 24, 10, 40, 99, 12, 91, "11", None, (11,), True, -11, 110, 5):
+    for key in (0, 22, 23, 24, 10, 40, 99, 15, 56, 91, "11", None, (11,), True, -11, 110, 5):
         with pytest.raises(ValueError):
             S.derived_nlcd({11: 0.5, key: 0.5}, 1.0)
     for value in (-0.1, -1e-300, 1.0000001, 2, float("nan"), float("inf"), -float("inf"), True,
@@ -819,15 +819,15 @@ def test_edge_raster_profile_is_a_fresh_dict():
     assert S.raster_profile("code") is not S.raster_profile("code")
     cols = S.record_columns()
     cols.append("x")
-    assert len(S.record_columns()) == 164 and S.record_columns() is not S.record_columns()
+    assert len(S.record_columns()) == 169 and S.record_columns() is not S.record_columns()
 
 
 def test_edge_record_columns_unique_and_ordered():
     cols = S.record_columns()
-    assert len(cols) == len(set(cols)) == 164
+    assert len(cols) == len(set(cols)) == 169
     assert cols[0] == "cell_id" and cols[-1] == "run_id"
-    assert cols.index("share_11") == 8 and cols.index("share_96") == 34
-    assert cols.index("top_code") == 35
+    assert cols.index("share_11") == 8 and cols.index("share_96") == 39
+    assert cols.index("top_code") == 40
     assert cols.index("nlcd_1985") < cols.index("nlcd_2025") < cols.index("classf_1985")
     assert cols.index("classf_2025") < cols.index("tcc_1985") < cols.index("tcc_2025")
     assert all(isinstance(c, str) and c == c.strip() and c.isascii() for c in cols)
@@ -899,9 +899,9 @@ def test_edge_paths_are_pure_and_checked():
 
 
 def test_edge_import_has_no_side_effects_on_inputs_and_constants_are_consistent():
-    assert len(S.CODES) == len(S.CODE_LIST) == 27 and len(set(S.CODE_LIST)) == 27
+    assert len(S.CODES) == len(S.CODE_LIST) == 32 and len(set(S.CODE_LIST)) == 32
     assert set(S.CODE_LIST).isdisjoint(S.LEVEL1_CODES)
-    assert len({e.colour for e in S.CODES}) == 27
+    assert len({e.colour for e in S.CODES}) == 32
     assert S.HISTORY_YEARS[0] == 1985 and S.HISTORY_YEARS[-1] == 2025 and len(S.HISTORY_YEARS) == 41
     assert S.CELL_ID_FACTOR == 10**6 and S.CELL * S.CELLS_PER_CHUNK == S.CHUNK
     assert set(S.USACE_M_MAP) | set(S._TREE_ALL) == set(S.CODE_LIST)

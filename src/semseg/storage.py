@@ -192,3 +192,24 @@ def ensure_hf_home(roots, environ=None):
     elif not _inside(current, roots["semseg"]):
         raise ValueError(f"HF_HOME is outside the semseg root: {current}")
     return current
+
+
+def use_soft_hf_locks(module=None):
+    """Make the Hugging Face hub use `filelock.SoftFileLock` for its cache locks. Return the module (D58).
+
+    The GVFS (SMB) share refuses `os.open(O_RDWR)` on an existing file and `fchmod` (errno 95).
+    `FileLock` opens the lock file again on the second lock, so each download on the share fails.
+    `SoftFileLock` uses only `O_CREAT | O_EXCL`; `soft_lock` drops `mode`, so no `fchmod` occurs.
+    `module` is `huggingface_hub.utils._fixes` by default; tests give a stand-in object.
+    """
+    if module is None:
+        from huggingface_hub.utils import _fixes as module
+    module.FileLock = soft_lock
+    return module
+
+
+def soft_lock(lock_file, *args, mode=None, **kwargs):
+    """Return a `filelock.SoftFileLock` for `lock_file`. Ignore `mode`: the share refuses `fchmod` (D58)."""
+    from filelock import SoftFileLock
+
+    return SoftFileLock(lock_file, *args, **kwargs)

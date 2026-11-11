@@ -11,7 +11,7 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
 - Run the task gate: `python3 ~/.claude/skills/build-task/scripts/gate.py`.
 - Write the chunk list of each pilot (task 1.1): `uv run python -m semseg.grid <pid> ...`.
 - Run the set-up check (read only, no GPU run): `uv run python -m semseg.setup_check`. Exit code 3 = the lab share is not mounted.
-- Run the SAM 2 polygons (task 1.2) (only after Jack says run): `uv run python -m semseg.segment --demo --run`.
+- Run the SAM 2 polygons (task 1.2) (only after Jack says run): `uv run python -m semseg.segment --demo --run`, or all chunks of one pilot: `uv run python -m semseg.segment --pid 77 --run` (D59).
 
 ## Rules (2026-11-11)
 

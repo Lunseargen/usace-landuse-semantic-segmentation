@@ -1,4 +1,4 @@
-"""The data standard (`docs/DATA_STANDARD.md`, version 4) in code.
+"""The data standard (`docs/DATA_STANDARD.md`, version 6) in code.
 
 Task 0.2. This module has pure functions and constants only. No function reads or writes a
 file. The storage code is task 0.3. A bad input raises `ValueError`. A function never rounds an
@@ -19,7 +19,7 @@ from numbers import Integral, Real
 from pathlib import PurePosixPath
 from typing import NamedTuple
 
-DATA_STANDARD_VERSION = 4
+DATA_STANDARD_VERSION = 6
 
 # ---------------------------------------------------------------- grid (DS-1 to DS-4, DS-7, DS-8)
 
@@ -209,13 +209,14 @@ NODATA = 0
 
 
 class Code(NamedTuple):
-    """One row of the code table: name, NLCD flag, USACE-M raster code (None for a tree code)."""
+    """One row of the code table: name, NLCD flag, USACE-M raster code (None for a tree code), text prompt."""
 
     code: int
     name: str
     nlcd: str
     usace_m: int | None
     colour: str
+    prompt: str
 
 
 class Derived(NamedTuple):
@@ -225,60 +226,68 @@ class Derived(NamedTuple):
     colour: str | None
 
 
-# DS-16: photo code -> scheme.py raster code. The tree codes 41, 42, 43, 44 and 90 have no
-# fixed target (DS-15).
+# DS-16 (map version 2, D60): photo code -> scheme.py raster code. The tree codes 41, 42, 43,
+# 44 and 90 have no fixed target (DS-15). The shrub codes 52 to 55 have a target here, but
+# DS-15 sums them into one shrubland target.
 USACE_M_MAP = {
     11: 1, 13: 1, 14: 1,
     25: 2, 26: 2, 27: 2, 28: 2, 29: 2,
-    31: 3, 35: 3,
+    12: 3, 31: 3, 35: 3,
     32: 4, 34: 4,
     33: 5,
+    36: 6,
     96: 8,
     95: 9,
     21: 10, 71: 10,
     81: 12,
     82: 13, 83: 13,
-    52: 26,
+    52: 26, 53: 16, 54: 15, 55: 14,
     51: 17,
 }
 USACE_M_LABELS = {
-    1: "M01", 2: "M02", 3: "M03", 4: "M04", 5: "M05", 8: "M08", 9: "M09", 10: "M10",
-    12: "M12", 13: "M13", 17: "M17", 18: "M18", 19: "M19", 20: "M20", 21: "M21", 22: "M22",
+    1: "M01", 2: "M02", 3: "M03", 4: "M04", 5: "M05", 6: "M06", 8: "M08", 9: "M09", 10: "M10",
+    12: "M12", 13: "M13", 14: "M14", 15: "M15", 16: "M16", 17: "M17", 18: "M18", 19: "M19", 20: "M20", 21: "M21", 22: "M22",
     23: "M23", 24: "M24", 26: "M14-16u", 27: "M19-21u", 28: "M22-24u",
 }
-USACE_M_NOT_PRODUCED = frozenset({6, 7, 11, 14, 15, 16, 25, 29})
+USACE_M_NOT_PRODUCED = frozenset({7, 11, 25, 29})
 
 _TABLE = (
-    (11, "Open water", "yes", "#466b9f"),
-    (13, "River or stream", "new", "#5a86b8"),
-    (14, "Pond", "new", "#2f4f7a"),
-    (21, "Developed, open space (maintained grass)", "yes", "#dec5c5"),
-    (25, "Building", "new", "#8b0000"),
-    (26, "Paved road", "new", "#ff3b3b"),
-    (27, "Unpaved road", "new", "#c9846b"),
-    (28, "Parking or other paved", "new", "#e3aa9c"),
-    (29, "Dam or levee", "new", "#7a3d3d"),
-    (31, "Barren, type not known", "yes", "#b3ac9f"),
-    (32, "Sand or beach", "new", "#e8dcb0"),
-    (33, "Rock or cliff", "new", "#8f8a80"),
-    (34, "Mud flat or drawdown shore", "new", "#a89b84"),
-    (35, "Gravel or quarry", "new", "#c7c2b8"),
-    (41, "Deciduous forest", "yes", "#68ab5f"),
-    (42, "Evergreen forest", "yes", "#1c5f2c"),
-    (43, "Mixed forest", "yes", "#b5c58f"),
-    (44, "Forest, leaf type not known", "new", "#4f8a4a"),
-    (51, "Dwarf shrub", "yes", "#af963c"),
-    (52, "Shrub or scrub", "yes", "#ccb879"),
-    (71, "Grassland or herbaceous", "yes", "#dfdfc2"),
-    (81, "Pasture or hay", "yes", "#dcd939"),
-    (82, "Cultivated crops", "yes", "#ab6c28"),
-    (83, "Fallow or bare field", "new", "#c9a27a"),
-    (90, "Woody wetland", "yes", "#b8d9eb"),
-    (95, "Emergent herbaceous wetland", "yes", "#6c9fb8"),
-    (96, "Aquatic bed", "new", "#4f7f99"),
+    (11, "Open water", "yes", "#466b9f", "lake"),
+    (12, "Perennial ice or snow", "yes", "#d1def8", "snow and ice"),
+    (13, "River or stream", "new", "#5a86b8", "river"),
+    (14, "Pond", "new", "#2f4f7a", "pond"),
+    (21, "Developed, open space (maintained grass)", "yes", "#dec5c5", "mowed lawn"),
+    (25, "Building", "new", "#8b0000", "building"),
+    (26, "Paved road", "new", "#ff3b3b", "paved road"),
+    (27, "Unpaved road", "new", "#c9846b", "dirt road"),
+    (28, "Parking or other paved", "new", "#e3aa9c", "parking lot"),
+    (29, "Dam or levee", "new", "#7a3d3d", "dam"),
+    (31, "Barren, type not known", "yes", "#b3ac9f", "bare ground"),
+    (32, "Sand or beach", "new", "#e8dcb0", "sandy beach"),
+    (33, "Rock or cliff", "new", "#8f8a80", "rock outcrop"),
+    (34, "Mud flat or drawdown shore", "new", "#a89b84", "mud flat"),
+    (35, "Gravel or quarry", "new", "#c7c2b8", "gravel pit"),
+    (36, "Boulder, cobble or talus", "new", "#6f6a62", "boulder field"),
+    (41, "Deciduous forest", "yes", "#68ab5f", "deciduous trees"),
+    (42, "Evergreen forest", "yes", "#1c5f2c", "evergreen trees"),
+    (43, "Mixed forest", "yes", "#b5c58f", "mixed forest"),
+    (44, "Forest, leaf type not known", "new", "#4f8a4a", "tree canopy"),
+    (51, "Dwarf shrub", "yes", "#af963c", "dwarf shrubs"),
+    (52, "Shrub or scrub, leaf type not known", "yes", "#ccb879", "shrubs"),
+    (53, "Deciduous shrub", "new", "#d6c48a", "deciduous shrubs"),
+    (54, "Evergreen shrub", "new", "#8c7a3a", "evergreen shrubs"),
+    (55, "Mixed shrub", "new", "#bfa65a", "mixed shrubs"),
+    (71, "Grassland or herbaceous", "yes", "#dfdfc2", "grassland"),
+    (81, "Pasture or hay", "yes", "#dcd939", "pasture"),
+    (82, "Cultivated crops", "yes", "#ab6c28", "crop field"),
+    (83, "Fallow or bare field", "new", "#c9a27a", "bare farm field"),
+    (90, "Woody wetland", "yes", "#b8d9eb", "swamp forest"),
+    (95, "Emergent herbaceous wetland", "yes", "#6c9fb8", "marsh"),
+    (96, "Aquatic bed", "new", "#4f7f99", "floating water plants"),
 )
-CODES = tuple(Code(c, n, f, USACE_M_MAP.get(c), col) for c, n, f, col in _TABLE)
+CODES = tuple(Code(c, n, f, USACE_M_MAP.get(c), col, prompt) for c, n, f, col, prompt in _TABLE)
 CODE_LIST = tuple(entry.code for entry in CODES)
+PROMPTS = {entry.code: entry.prompt for entry in CODES}  # DS-11, D51: code 0 has no prompt
 _BY_CODE = {entry.code: entry for entry in CODES}
 
 LEVEL1_CODES = {
@@ -296,6 +305,7 @@ NLCD_LEGEND = {
 _DERIVED_NAMES = {
     0: "No photo",
     11: "Open water",
+    12: "Perennial ice/snow",
     21: "Developed, open space",
     22: "Developed, low intensity",
     23: "Developed, medium intensity",
@@ -325,6 +335,70 @@ def _code_int(code):
     return int(code)
 
 
+# ---------------------------------------------------------------- machine labels and the map vote (DS-12, DS-29)
+
+VOTE_NONE = 0          # NLCD values that map to no code (72, 73, 74)
+VOTE_NODATA = None     # NLCD 250: excluded from the vote
+VOTE_DEVELOPED = 20    # D56: the level-1 code that the maps give to developed land
+
+# D52, D60: an Annual NLCD value -> a code. The 14 NLCD codes of the table keep their meaning (D6).
+NLCD_VOTE = {
+    **{c: c for c in (11, 12, 21, 31, 41, 42, 43, 51, 52, 71, 81, 82, 90, 95)},
+    22: VOTE_DEVELOPED, 23: VOTE_DEVELOPED, 24: VOTE_DEVELOPED,
+    72: VOTE_NONE, 73: VOTE_NONE, 74: VOTE_NONE,
+    _STACK_NLCD_NODATA: VOTE_NODATA,
+}
+_CLASSF_MAX = 29  # the highest scheme.py raster code (DS-16)
+
+
+def _classf_vote():
+    """The inverse of USACE_M_MAP, kept where exactly one code maps to the raster code (D52)."""
+    inverse = {}
+    for code, raster in USACE_M_MAP.items():
+        inverse.setdefault(raster, []).append(code)
+    return {raster: codes[0] for raster, codes in inverse.items() if len(codes) == 1}
+
+
+CLASSF_VOTE = _classf_vote()
+
+
+def vote_code(nlcd, classf):
+    """DS-29 (D52, D56): the code that one 30 m pixel votes for, from its `nlcd_2022` and `classf_2022` values.
+
+    Return a code, 20 (Developed), `VOTE_NONE` (0) or `VOTE_NODATA` (None). A bool, a non-integer,
+    an NLCD value outside the table or a classf value above 29 raises ValueError.
+    """
+    nlcd, classf = _code_int(nlcd), _code_int(classf)
+    if nlcd not in NLCD_VOTE:
+        raise ValueError(f"nlcd_2022 value {nlcd} is not in the vote table (FM-88)")
+    if not 0 <= classf <= _CLASSF_MAX:
+        raise ValueError(f"classf_2022 value {classf} is not a raster code 0 to {_CLASSF_MAX} (FM-88)")
+    if classf in CLASSF_VOTE:
+        return CLASSF_VOTE[classf]
+    vote = NLCD_VOTE[nlcd]
+    if vote:                   # a table code or 20
+        return vote
+    if classf == 2:            # M02: developed, only where NLCD gives none or no data (D56)
+        return VOTE_DEVELOPED
+    return vote
+
+
+def check_machine_code(code):
+    """DS-12, D54: a machine label (code_prompt, code_clf) is 0 or one of the 32 codes. Return it as an int."""
+    code = _code_int(code)
+    if code != NODATA and code not in _BY_CODE:
+        raise ValueError(f"a machine label must be 0 or one of the 32 codes, got {code}")
+    return code
+
+
+def check_vote_code(code):
+    """DS-12, D56: code_vote is 0, one of the 32 codes, or 20. Return it as an int."""
+    code = _code_int(code)
+    if code != VOTE_DEVELOPED:
+        check_machine_code(code)
+    return code
+
+
 def level1(code):
     """DS-12: the level-1 code of a code. 99 for wetlands; a level-1 code gives itself."""
     code = _code_int(code)
@@ -336,7 +410,7 @@ def level1(code):
 
 
 def is_label_code(code):
-    """DS-12: true for the 27 codes and the 8 level-1 codes (35 codes)."""
+    """DS-12: true for the 32 codes and the 8 level-1 codes (40 codes)."""
     return code in _BY_CODE or code in LEVEL1_CODES
 
 
@@ -367,14 +441,21 @@ _DEVELOPED = (25, 26, 27, 28, 29)
 _TREE_LEAF = (41, 42, 43)
 _TREE_ALL = (41, 42, 43, 44, 90)
 _NLCD_GROUPS = {
-    11: (11, 13, 14), 21: (21,), 31: (31, 32, 33, 34, 35), 41: (41,), 42: (42,),
-    43: (43, 44), 52: (51, 52), 71: (71,), 81: (81,), 82: (82, 83), 90: (90,), 95: (95, 96),
+    11: (11, 13, 14), 12: (12,), 21: (21,), 31: (31, 32, 33, 34, 35, 36), 41: (41,), 42: (42,),
+    43: (43, 44), 52: (51, 52, 53, 54, 55), 71: (71,), 81: (81,), 82: (82, 83), 90: (90,), 95: (95, 96),
 }
 _USACE_M_TREE_CLASSES = frozenset({18, 19, 20, 21, 22, 23, 24, 27, 28})
 _CLOSED = {41: 24, 42: 23, 43: 22}
 _OPEN = {41: 21, 42: 20, 43: 19}
+_SHRUB_ALL = (52, 53, 54, 55)
+_SHRUB_LEAF = {53: 16, 54: 15, 55: 14}  # D60: deciduous M16, evergreen M15, mixed M14
+_SHRUB_MIXED = 14
+_SHRUB_UNRESOLVED = 26
 FLAG_WOODY_WETLAND = 1
+FLAG_INTRODUCED = 2      # F2, from the stack (D60)
+FLAG_DRAWDOWN = 4        # F3, from the stack (D60)
 FLAG_MAINTAINED_GRASS = 128
+_STACK_FLAG_BITS = FLAG_INTRODUCED | FLAG_DRAWDOWN
 
 
 def _share(value, name):
@@ -390,7 +471,7 @@ def _gsum(values):
 
 
 def _check_shares(shares, photo_share):
-    """Check the input of a composition. Return (shares of the 27 codes, photo_share)."""
+    """Check the input of a composition. Return (shares of the 32 codes, photo_share)."""
     if not isinstance(shares, Mapping):
         raise ValueError("shares must be a mapping from code to share")
     photo = _share(photo_share, "photo_share")
@@ -448,17 +529,37 @@ def derived_usace_m(shares, photo_share):
         return table[leaders[0] if len(leaders) == 1 else 43]
     sums = {}
     for code, target in USACE_M_MAP.items():
-        sums.setdefault(target, []).append(full[code])
+        if code not in _SHRUB_ALL:
+            sums.setdefault(target, []).append(full[code])
     totals = {target: _gsum(values) for target, values in sums.items()}
+    shrub = _shrub_target(full)
+    totals[shrub] = _gsum(full[c] for c in _SHRUB_ALL)  # D60: one shrubland target
     return min(totals, key=lambda target: (-totals[target], target))
 
 
-def usace_m_flags(shares, photo_share):
-    """DS-16: the flags of a cell. Bit 1 = woody wetland, bit 128 = maintained grass."""
+def _shrub_target(full):
+    """DS-15, D60: the raster code of the shrubland target, from the largest of 53, 54, 55."""
+    single = _rounded(full)
+    largest = max(single[c] for c in _SHRUB_LEAF)
+    if largest == 0:
+        return _SHRUB_UNRESOLVED
+    leaders = [c for c in _SHRUB_LEAF if single[c] == largest]
+    return _SHRUB_LEAF[leaders[0]] if len(leaders) == 1 else _SHRUB_MIXED
+
+
+def usace_m_flags(shares, photo_share, stack_flags=0):
+    """DS-16: the flags of a cell. Bit 1 = woody wetland, bit 128 = maintained grass (from the photo).
+
+    Bits 2 (F2 introduced) and 4 (F3 drawdown) come from `stack_flags`, the uint8 value of the
+    stack `flags_<naip_year>` at the cell (D60). The other stack bits are not copied.
+    """
     full, photo = _check_shares(shares, photo_share)
+    stack_flags = _int(stack_flags, "stack_flags")
+    if not 0 <= stack_flags <= 255:
+        raise ValueError(f"stack_flags must be a uint8 value 0 to 255, got {stack_flags}")
     code = derived_usace_m(full, photo)
     single = _rounded(full)
-    flags = 0
+    flags = stack_flags & _STACK_FLAG_BITS
     if code in _USACE_M_TREE_CLASSES and single[90] >= _gsum(single[c] for c in (41, 42, 43, 44)):
         flags |= FLAG_WOODY_WETLAND
     if code == 10 and single[21] >= single[71]:
@@ -473,6 +574,157 @@ def top_code(shares, photo_share):
         return 0
     single = _rounded(full)
     return min(single, key=lambda c: (-single[c], c))
+
+
+# ---------------------------------------------------------------- change and condition (DS-31 to DS-34, D60)
+
+CHANGE_GROUPS = {
+    "W": (1, 29), "D": (2,), "X": (3,), "SP": (4, 5, 6, 7, 25), "AB": (8,), "EM": (9,),
+    "H": (10, 11), "AG": (12, 13), "S": (14, 15, 16, 17, 26), "TO": (18, 19, 20, 21, 27),
+    "TC": (22, 23, 24, 28),
+}
+_GROUP_OF = {code: group for group, codes in CHANGE_GROUPS.items() for code in codes}
+VEG_GROUPS = frozenset({"SP", "EM", "H", "S", "TO", "TC"})
+_TREE_GROUPS = frozenset({"TO", "TC"})
+
+CHANGE_CATEGORIES = {
+    0: "No data",
+    1: "Persistence",
+    2: "Unconfirmed",
+    3: "Wetland gain",
+    4: "Wetland loss",
+    5: "Inundation",
+    6: "Exposure, bare",
+    7: "Exposure, vegetated",
+    8: "Exposure, other",
+    9: "Refinement: canopy closure",
+    10: "Refinement: canopy opening",
+    11: "Refinement: other",
+    12: "Succession / woody encroachment",
+    13: "Woody loss",
+    14: "Loss to development",
+    15: "Loss to extractive / barren",
+    16: "Loss to agriculture",
+    17: "Agricultural recovery",
+    18: "Recovery from developed / barren",
+    19: "Other change",
+}
+
+ASSESSED = frozenset({4, 5, 6, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28})
+CONDITION_STATES = {0: "No data", 1: "Sustainable", 2: "Transitioning", 3: "Degraded", 4: "Not assessed"}
+TRAJECTORIES = {0: "Not available", 1: "Recovering", 2: "Stable", 3: "Declining"}
+SCORE_CHANGES = {1: "Improved", 2: "Unchanged", 3: "Declined"}
+TREND_WINDOW = 6          # the years t-5 ... t
+TREND_LIMIT = 0.1         # points per year
+SCORE_CHANGE_LIMIT = 0.5  # points
+
+
+def change_group(raster_code):
+    """DS-31: the change group of a USACE-M raster code; None for code 0."""
+    raster_code = _code_int(raster_code)
+    if raster_code == NODATA:
+        return None
+    if raster_code not in _GROUP_OF:
+        raise ValueError(f"not a USACE-M raster code: {raster_code}")
+    return _GROUP_OF[raster_code]
+
+
+def change_category(from_code, to_code, confirmed=True):
+    """DS-32: the change category of a cell from raster code `from_code` (t1) to `to_code` (t2)."""
+    g1, g2 = change_group(from_code), change_group(to_code)
+    if not isinstance(confirmed, bool):
+        raise ValueError(f"confirmed must be True or False, got {confirmed!r}")
+    if g1 is None or g2 is None:
+        return 0
+    if from_code == to_code:
+        return 1
+    if not confirmed:
+        return 2
+    if (g1 in ("H", "SP") and g2 == "EM") or (g1 == "W" and g2 == "AB"):
+        return 3
+    if (g1 == "EM" and g2 in ("H", "SP")) or (g1 == "AB" and g2 == "W"):
+        return 4
+    if g1 == g2:
+        return 11
+    if g2 == "W":
+        return 5
+    if g1 == "W":
+        return 6 if g2 == "SP" else 7 if g2 in ("EM", "H") else 8
+    if (g1, g2) == ("TO", "TC"):
+        return 9
+    if (g1, g2) == ("TC", "TO"):
+        return 10
+    if ((g1 == "H" and g2 in ("S", "TO", "TC")) or (g1 == "S" and g2 in _TREE_GROUPS)
+            or (g1 == "SP" and g2 in VEG_GROUPS) or (g1 == "EM" and g2 in ("S", "TO", "TC"))):
+        return 12
+    if ((g1 in _TREE_GROUPS and g2 in ("S", "H")) or (g1 == "S" and g2 == "H")
+            or (g1 in VEG_GROUPS and g2 == "SP")):
+        return 13
+    if g1 in VEG_GROUPS:
+        return {"D": 14, "X": 15, "AG": 16}.get(g2, 19)
+    if g2 in VEG_GROUPS:
+        return {"AG": 17, "D": 18, "X": 18}.get(g1, 19)
+    return 19
+
+
+def _score(score):
+    """A stand score: a real number 1 to 5, rounded to 9 decimals."""
+    score = round(float(_real(score, "score")), 9)
+    if not 1 <= score <= 5:
+        raise ValueError(f"a score must be 1 to 5, got {score}")
+    return score
+
+
+def condition_rating(score):
+    """DS-33: the rating A, B, C or D of a stand score (1 to 5)."""
+    score = _score(score)
+    return "A" if score >= 4.5 else "B" if score >= 3.5 else "C" if score >= 2.0 else "D"
+
+
+def condition_state(raster_code, score=None):
+    """DS-33: the state code of a stand (0 no data, 1 S, 2 T, 3 D, 4 not assessed)."""
+    raster_code = _code_int(raster_code)
+    change_group(raster_code)  # a bad raster code raises
+    if raster_code == NODATA:
+        return 0
+    if raster_code not in ASSESSED:
+        if score is not None:
+            raise ValueError(f"raster code {raster_code} is not assessed, so it has no score")
+        return 4
+    if score is None:
+        raise ValueError(f"raster code {raster_code} is assessed, so it needs a score")
+    return {"A": 1, "B": 1, "C": 2, "D": 3}[condition_rating(score)]
+
+
+def trend_slope(scores):
+    """DS-34: the Theil-Sen slope (points per year) of the 6 yearly scores t-5 ... t, rounded to 9 decimals."""
+    if isinstance(scores, (str, bytes)) or not hasattr(scores, "__len__"):
+        raise ValueError("scores must be a sequence of 6 numbers")
+    values = [float(_real(v, "score")) for v in scores]
+    if len(values) != TREND_WINDOW:
+        raise ValueError(f"the trend needs {TREND_WINDOW} yearly scores, got {len(values)}")
+    slopes = sorted((values[j] - values[i]) / (j - i)
+                    for i in range(TREND_WINDOW) for j in range(i + 1, TREND_WINDOW))
+    mid = len(slopes) // 2  # 15 slopes: the median is the middle one
+    return round(slopes[mid], 9)
+
+
+def trajectory(slope, assessed_before=True):
+    """DS-34: the trajectory code (0 not available, 1 Recovering, 2 Stable, 3 Declining)."""
+    if not isinstance(assessed_before, bool):
+        raise ValueError(f"assessed_before must be True or False, got {assessed_before!r}")
+    if not assessed_before:
+        return 1
+    if slope is None:
+        return 0
+    slope = round(float(_real(slope, "slope")), 9)
+    return 1 if slope >= TREND_LIMIT else 3 if slope <= -TREND_LIMIT else 2
+
+
+def score_change(score_t1, score_t2):
+    """DS-34: the score change code from t1 to t2 (1 improved, 2 unchanged, 3 declined)."""
+    d = round(_score(score_t2) - _score(score_t1), 9)
+    return 1 if d >= SCORE_CHANGE_LIMIT else 3 if d <= -SCORE_CHANGE_LIMIT else 2
 
 
 # ---------------------------------------------------------------- names and records (DS-5 to DS-28)

@@ -112,6 +112,7 @@ def test_edge_read_chunk_nodata_is_read_through_and_does_not_change_the_profile(
                "crs": "EPSG:5070", "transform": TRANSFORM}
     with rasterio.open(path, "w", **profile) as dst:
         dst.write(data)
+        dst.update_tags(gsd="0.6", years="2022")  # D57
     rgb, transform, _ = segment.read_chunk(path)
     assert rgb.dtype == np.uint8 and rgb[0, 0].tolist() == [0, 0, 0] and rgb[20, 20].tolist() == [7, 7, 7]
     assert transform == TRANSFORM

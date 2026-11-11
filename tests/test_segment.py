@@ -88,6 +88,7 @@ def write_tif(path, bounds=BOUNDS, bands=4, dtype="uint8", crs="EPSG:5070", size
                "crs": crs, "transform": from_origin(bounds[0], bounds[3], pixel, pixel)}
     with rasterio.open(path, "w", **profile) as dst:
         dst.write(data)
+        dst.update_tags(gsd="0.6", years="2022")  # D57: the NAIP source GSD and the NAIP year
     return path
 
 
@@ -784,3 +785,168 @@ def test_d48_run_writes_only_under_semseg_and_nothing_to_fgt_or_stack(tmp_path):
                  loader=Loader(), now=NOW)
     for k in ("fgt", "stack"):
         assert sorted(p.relative_to(roots[k]) for p in Path(roots[k]).rglob("*")) == before[k]
+
+
+# ------------------------------------------------------------------ D55 guard for LangSAM (task 1.3, FM-89)
+
+D55_ROWS = {
+    "samgeo.text_sam": ("LangSAM", "load_model_hf", "hf_hub_download", "SamGeo2"),
+    "groundingdino.util.inference": ("load_model",),
+    "groundingdino.util.get_tokenlizer": ("get_tokenlizer", "get_pretrained_language_model"),
+    "torch.hub": ("load_state_dict_from_url", "load", "download_url_to_file"),
+    "transformers.utils.hub": ("hf_hub_download", "snapshot_download", "cached_file", "cached_files"),
+}
+
+
+def test_d55_guarded_table_has_the_five_langsam_rows():
+    """FM-89, D55: GUARDED has the 5 new rows with the names of D55, and the old rows stay."""
+    for module, names in D55_ROWS.items():
+        assert module in conftest.GUARDED, module
+        assert set(names) <= set(conftest.GUARDED[module]), module
+    for old in ("samgeo", "samgeo.samgeo2", "sam2.build_sam", "huggingface_hub"):
+        assert old in conftest.GUARDED
+
+
+def test_d55_hf_offline_variables_are_set():
+    """FM-89, D55: conftest sets HF_HUB_OFFLINE and TRANSFORMERS_OFFLINE to 1 (no download)."""
+    assert os.environ.get("HF_HUB_OFFLINE") == "1"
+    assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
+
+
+def test_d55_patch_module_replaces_the_langsam_loaders_in_fake_modules():
+    """FM-89, D55: patch_module replaces each listed name of the 5 modules; a second patch changes nothing."""
+    for name, attrs in D55_ROWS.items():
+        fake = types.ModuleType(name)
+        for attr in attrs:
+            setattr(fake, attr, lambda *a, **k: "real")
+        assert sorted(conftest.patch_module(fake)) == sorted(attrs), name
+        for attr in attrs:
+            with pytest.raises(conftest.RealModelError):
+                getattr(fake, attr)("x", "y")
+        assert conftest.patch_module(fake) == []
+
+
+def test_guard_blocks_langsam_and_groundingdino_loaders():
+    """FM-89, D55: the real modules are guarded: LangSAM, GroundingDINO loaders, torch.hub, transformers."""
+    import groundingdino.util.get_tokenlizer as tokenlizer
+    import groundingdino.util.inference as inference
+    import samgeo.text_sam as text_sam
+    import torch.hub as hub
+    import transformers.utils.hub as tf_hub
+    for module, names in ((text_sam, D55_ROWS["samgeo.text_sam"]), (inference, ("load_model",)),
+                          (tokenlizer, D55_ROWS["groundingdino.util.get_tokenlizer"]),
+                          (hub, D55_ROWS["torch.hub"]), (tf_hub, D55_ROWS["transformers.utils.hub"])):
+        for attr in names:
+            if hasattr(module, attr):
+                assert getattr(getattr(module, attr), "_semseg_guard", False), f"{module.__name__}.{attr}"
+    with pytest.raises(conftest.RealModelError):
+        text_sam.LangSAM()
+    with pytest.raises(conftest.RealModelError):
+        text_sam.LangSAM(model_type="sam2-hiera-large")
+    with pytest.raises(conftest.RealModelError):
+        hub.load_state_dict_from_url("https://example.invalid/x.pth")
+    with pytest.raises(conftest.RealModelError):
+        hub.load("some/repo", "model")
+    with pytest.raises(conftest.RealModelError):
+        inference.load_model("cfg.py", "weights.pth")
+    with pytest.raises(conftest.RealModelError):
+        tokenlizer.get_tokenlizer("bert-base-uncased")
+    with pytest.raises(conftest.RealModelError):
+        tf_hub.cached_file("semseg-test/not-a-model", "config.json")
+    with pytest.raises(conftest.RealModelError):
+        tf_hub.snapshot_download("semseg-test/not-a-model")
+
+
+def test_d55_transformers_from_pretrained_hits_the_guard_not_the_network():
+    """FM-89, D55: from_pretrained fails with the guard error somewhere in the exception chain."""
+    import transformers.utils.hub as tf_hub
+    from transformers import AutoTokenizer
+    assert os.environ.get("TRANSFORMERS_OFFLINE") == "1" and tf_hub.cached_file._semseg_guard
+    with pytest.raises(Exception) as info:
+        AutoTokenizer.from_pretrained("semseg-test/not-a-model")
+    chain, seen = [], info.value
+    while seen is not None and len(chain) < 10:
+        chain.append(seen)
+        seen = seen.__cause__ or seen.__context__
+    assert any(isinstance(item, conftest.RealModelError) for item in chain), chain
+
+
+# ------------------------------------------------------------------ D59 --pid: all chunks of a pilot
+
+def write_chunk_list(roots, chunk_ids, columns=None):
+    import pandas as pd
+
+    path = roots["semseg"] / FOLDER / standard.CHUNK_LIST
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame({"chunk": list(chunk_ids)}) if columns is None else pd.DataFrame(columns)
+    df.to_parquet(path)
+    return path
+
+
+def test_d59_pilot_chunks_in_file_order(tmp_path):
+    roots = make_roots(tmp_path)
+    write_chunk_list(roots, ["r2_c2", "r1_c1"])
+    assert segment.pilot_chunks(roots, FOLDER) == ["r2_c2", "r1_c1"]
+
+
+def test_d59_pilot_chunks_missing_file(tmp_path):
+    roots = make_roots(tmp_path)
+    with pytest.raises(FileNotFoundError, match="task 1.1"):
+        segment.pilot_chunks(roots, FOLDER)
+
+
+def test_d59_pilot_chunks_no_chunk_column(tmp_path):
+    roots = make_roots(tmp_path)
+    write_chunk_list(roots, [], columns={"row": [1]})
+    with pytest.raises(ValueError, match="no column `chunk`"):
+        segment.pilot_chunks(roots, FOLDER)
+
+
+def test_d59_pilot_chunks_empty(tmp_path):
+    roots = make_roots(tmp_path)
+    write_chunk_list(roots, [])
+    with pytest.raises(ValueError, match="empty"):
+        segment.pilot_chunks(roots, FOLDER)
+
+
+def test_d59_cli_pid_run_does_all_chunks_of_the_list(tmp_path, capsys):
+    chunks = [CHUNK]
+    roots, config = demo_setup(tmp_path, chunks)
+    config = {k: v for k, v in config.items() if k != "demo"}  # --pid needs no `demo` section
+    write_chunk_list(roots, chunks)
+    loader = Loader()
+    assert segment.main(["--pid", "77", "--run"], roots=roots, config=config, probe=Probe(30000),
+                        loader=loader, now=NOW) == 0
+    assert loader.calls == 1
+    assert (roots["semseg"] / FOLDER / "polygons" / f"{CHUNK}.gpkg").is_file()
+    log = json.loads((roots["semseg"] / "runs" / standard.run_id(NOW, "sam2") / "log.json").read_text())
+    assert log["chunks"] == chunks and log["chunks_done"] == chunks
+
+
+def test_d59_cli_pid_without_run_refuses_and_names_the_flag(tmp_path, capsys):
+    roots, config = demo_setup(tmp_path, [CHUNK])
+    loader, probe = Loader(), Probe(99999)
+    with pytest.raises(SystemExit) as info:
+        segment.main(["--pid", "77"], roots=roots, config=config, probe=probe, loader=loader, now=NOW)
+    assert info.value.code == 2 and loader.calls == 0 and probe.count == 0
+    assert "--pid needs --run" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("argv", [["--demo", "--pid", "77", "--run"], ["--pid", "x", "--run"], ["--pid", "--run"]])
+def test_d59_cli_bad_pid_arguments_are_refused(tmp_path, argv):
+    roots, config = demo_setup(tmp_path, [CHUNK])
+    loader, probe = Loader(), Probe(99999)
+    with pytest.raises(SystemExit) as info:
+        segment.main(argv, roots=roots, config=config, probe=probe, loader=loader, now=NOW)
+    assert info.value.code == 2 and loader.calls == 0 and probe.count == 0
+
+
+def test_d59_cli_pid_low_memory_log_lists_the_pilot_chunks(tmp_path):
+    roots, config = demo_setup(tmp_path, [CHUNK])
+    write_chunk_list(roots, [CHUNK])
+    with pytest.raises(SystemExit) as info:
+        segment.main(["--pid", "77", "--run"], roots=roots, config=config, probe=Probe(1),
+                     loader=Loader(), now=NOW)
+    assert info.value.code == segment.EXIT_LOW_MEMORY
+    log = json.loads((roots["semseg"] / "runs" / standard.run_id(NOW, "sam2") / "log.json").read_text())
+    assert log["chunks"] == [CHUNK] and log["chunks_done"] == []

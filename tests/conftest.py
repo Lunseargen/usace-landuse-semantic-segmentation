@@ -1,18 +1,24 @@
-"""Guard for FM-71 and D22: no test builds a real SAM 2 model or downloads weights.
+"""Guard for FM-71, FM-89 and D22: no test builds a real SAM 2 or LangSAM model or downloads weights.
 
 The guard replaces the entry points with a function that raises `RealModelError`:
-`samgeo.SamGeo2` (and `samgeo.samgeo2.SamGeo2`), `sam2.build_sam.build_sam2*`, and
-`hf_hub_download` / `snapshot_download` in `huggingface_hub` and its `file_download`,
-`_snapshot_download` and `hub_mixin` modules. The guard installs when this file is imported,
-before the collection of any test module. An import hook applies the guard to each of these
-modules right after the first import, so the order of the imports does not matter.
+`samgeo.SamGeo2` (and `samgeo.samgeo2.SamGeo2`), `samgeo.text_sam.LangSAM`,
+`sam2.build_sam.build_sam2*`, the GroundingDINO loaders, `torch.hub` loaders, and
+`hf_hub_download` / `snapshot_download` / `cached_file` in `huggingface_hub`, its `file_download`,
+`_snapshot_download` and `hub_mixin` modules, and `transformers.utils.hub` (D55). The guard installs when this
+file is imported, before the collection of any test module. An import hook applies the guard to
+each of these modules right after the first import, so the order of the imports does not matter.
+The Hugging Face offline variables are the second layer: no download.
 """
 
 import importlib.abc
 import importlib.machinery
+import os
 import sys
 
 import pytest
+
+os.environ["HF_HUB_OFFLINE"] = "1"        # D55: second layer, no download
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 GUARDED = {
     "samgeo": ("SamGeo2",),
@@ -23,11 +29,17 @@ GUARDED = {
     "huggingface_hub.file_download": ("hf_hub_download",),
     "huggingface_hub._snapshot_download": ("snapshot_download",),
     "huggingface_hub.hub_mixin": ("hf_hub_download", "snapshot_download"),
+    # D55 (task 1.3, FM-89): LangSAM, GroundingDINO, torch.hub and transformers
+    "samgeo.text_sam": ("LangSAM", "load_model_hf", "hf_hub_download", "SamGeo2"),
+    "groundingdino.util.inference": ("load_model",),
+    "groundingdino.util.get_tokenlizer": ("get_tokenlizer", "get_pretrained_language_model"),
+    "torch.hub": ("load_state_dict_from_url", "load", "download_url_to_file"),
+    "transformers.utils.hub": ("hf_hub_download", "snapshot_download", "cached_file", "cached_files"),
 }
 
 
 class RealModelError(AssertionError):
-    """A test tried to build a real SAM 2 model or to download weights (D22, FM-71)."""
+    """A test tried to build a real SAM 2 or LangSAM model or to download weights (D22, FM-71, FM-89)."""
 
 
 def _forbidden(name):

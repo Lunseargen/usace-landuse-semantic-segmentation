@@ -21,6 +21,7 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from semseg import standard as S
+from semseg.config import load_config
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -53,6 +54,7 @@ OWNED_ELSEWHERE = {
 CODE_TABLE = [
     # code, NLCD code?, colour (section B of decisions.md)
     (11, True, "#466b9f"),
+    (12, True, "#d1def8"),
     (13, False, "#5a86b8"),
     (14, False, "#2f4f7a"),
     (21, True, "#dec5c5"),
@@ -66,12 +68,16 @@ CODE_TABLE = [
     (33, False, "#8f8a80"),
     (34, False, "#a89b84"),
     (35, False, "#c7c2b8"),
+    (36, False, "#6f6a62"),
     (41, True, "#68ab5f"),
     (42, True, "#1c5f2c"),
     (43, True, "#b5c58f"),
     (44, False, "#4f8a4a"),
     (51, True, "#af963c"),
     (52, True, "#ccb879"),
+    (53, False, "#d6c48a"),
+    (54, False, "#8c7a3a"),
+    (55, False, "#bfa65a"),
     (71, True, "#dfdfc2"),
     (81, True, "#dcd939"),
     (82, True, "#ab6c28"),
@@ -88,7 +94,7 @@ NLCD_LEGEND_EXPECTED = {
     71: "#dfdfc2", 72: "#d1d182", 73: "#a3cc51", 74: "#82ba9e", 81: "#dcd939", 82: "#ab6c28",
     90: "#b8d9eb", 95: "#6c9fb8",
 }
-DERIVED_CODES = {0, 11, 21, 22, 23, 24, 31, 41, 42, 43, 52, 71, 81, 82, 90, 95}
+DERIVED_CODES = {0, 11, 12, 21, 22, 23, 24, 31, 41, 42, 43, 52, 71, 81, 82, 90, 95}
 LEVEL1_EXPECTED = {
     10: "Water", 20: "Developed", 30: "Barren", 40: "Forest", 50: "Shrubland",
     70: "Herbaceous", 80: "Planted or cultivated", 99: "Wetlands",
@@ -96,21 +102,22 @@ LEVEL1_EXPECTED = {
 
 # DS-14 groups: output code <- member codes
 NLCD_GROUPS = {
-    11: (11, 13, 14), 21: (21,), 31: (31, 32, 33, 34, 35), 41: (41,), 42: (42,),
-    43: (43, 44), 52: (51, 52), 71: (71,), 81: (81,), 82: (82, 83), 90: (90,), 95: (95, 96),
+    11: (11, 13, 14), 12: (12,), 21: (21,), 31: (31, 32, 33, 34, 35, 36), 41: (41,), 42: (42,),
+    43: (43, 44), 52: (51, 52, 53, 54, 55), 71: (71,), 81: (81,), 82: (82, 83), 90: (90,), 95: (95, 96),
 }
 
 USACE_M_MAP_EXPECTED = {
-    11: 1, 13: 1, 14: 1, 25: 2, 26: 2, 27: 2, 28: 2, 29: 2, 31: 3, 35: 3, 32: 4, 34: 4, 33: 5,
-    96: 8, 95: 9, 21: 10, 71: 10, 81: 12, 82: 13, 83: 13, 52: 26, 51: 17,
+    11: 1, 13: 1, 14: 1, 25: 2, 26: 2, 27: 2, 28: 2, 29: 2, 12: 3, 31: 3, 35: 3, 32: 4, 34: 4,
+    33: 5, 36: 6, 96: 8, 95: 9, 21: 10, 71: 10, 81: 12, 82: 13, 83: 13, 52: 26, 53: 16, 54: 15,
+    55: 14, 51: 17,
 }
 TREE_CODES = (41, 42, 43, 44, 90)
 USACE_M_LABELS_EXPECTED = {
-    1: "M01", 2: "M02", 3: "M03", 4: "M04", 5: "M05", 8: "M08", 9: "M09", 10: "M10",
-    12: "M12", 13: "M13", 17: "M17", 18: "M18", 19: "M19", 20: "M20", 21: "M21", 22: "M22",
+    1: "M01", 2: "M02", 3: "M03", 4: "M04", 5: "M05", 6: "M06", 8: "M08", 9: "M09", 10: "M10",
+    12: "M12", 13: "M13", 14: "M14", 15: "M15", 16: "M16", 17: "M17", 18: "M18", 19: "M19", 20: "M20", 21: "M21", 22: "M22",
     23: "M23", 24: "M24", 26: "M14-16u", 27: "M19-21u", 28: "M22-24u",
 }
-NOT_PRODUCED_EXPECTED = {6, 7, 11, 14, 15, 16, 25, 29}
+NOT_PRODUCED_EXPECTED = {7, 11, 25, 29}
 
 
 # ---------------------------------------------------------------- helpers
@@ -257,7 +264,7 @@ def test_data_standard_version():
     """DS-16: the version constant equals the `Version <n>` line of docs/DATA_STANDARD.md (D31)."""
     m = re.search(r"^Version (\d+)", _doc_text(), re.MULTILINE)
     assert m, "no 'Version <n>' line in docs/DATA_STANDARD.md"
-    assert S.DATA_STANDARD_VERSION == 4
+    assert S.DATA_STANDARD_VERSION == 6
     assert int(m.group(1)) == S.DATA_STANDARD_VERSION
 
 
@@ -539,9 +546,9 @@ def test_check_naip_transform():
 
 
 def test_code_table():
-    """DS-11, DS-12, DS-13, R3, FM-27: 27 codes, order, colours, level-1 codes, nodata."""
+    """DS-11, DS-12, DS-13, R3, FM-27: 32 codes, order, colours, level-1 codes, nodata."""
     assert _codes_of(S.CODES) == CODES_IN_ORDER
-    assert len(CODES_IN_ORDER) == 27 and len(set(CODES_IN_ORDER)) == 27
+    assert len(CODES_IN_ORDER) == 32 and len(set(CODES_IN_ORDER)) == 32
     assert S.NODATA == 0 and 0 not in CODES_IN_ORDER
     assert S.NLCD_LEGEND == NLCD_LEGEND_EXPECTED
     assert S.LEVEL1_CODES == LEVEL1_EXPECTED
@@ -558,43 +565,73 @@ def test_code_table():
     for code in (22, 23, 24):
         seen.append(S.colour(code).lower())
         assert S.colour(code).lower() == NLCD_LEGEND_EXPECTED[code]
-    assert len(seen) == 30 and len(set(seen)) == 30
+    assert len(seen) == 35 and len(set(seen)) == 35
     # the code table in docs/DATA_STANDARD.md agrees with the code (the doc is edited first)
     rows = re.findall(
-        r"^\|[^|]*\|\s*(\d{2})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*`(#[0-9a-fA-F]{6})`\s*\|\s*$",
-        _doc_text(), re.MULTILINE)
-    assert [(int(c), col.lower()) for c, col in rows] == [(c, col) for c, _, col in CODE_TABLE]
+        r"^\|[^|]*\|\s*(\d{2})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*`(#[0-9a-fA-F]{6})`\s*\|\s*`([a-z ]+)`\s*\|\s*$",
+        _doc_text(), re.MULTILINE)  # 7 columns: the last one is the Prompt (D51)
+    assert [(int(c), col.lower()) for c, col, _ in rows] == [(c, col) for c, _, col in CODE_TABLE]
+    assert {int(c): prompt for c, _, prompt in rows} == S.PROMPTS
+
+
+def test_vote_tables_and_machine_codes():
+    """DS-29, DS-12, DS-11: the reverse maps, the vote of one pixel and the machine-label checks (D52, D54, D56)."""
+    assert S.CLASSF_VOTE == {5: 33, 6: 36, 8: 96, 9: 95, 12: 81, 14: 55, 15: 54, 16: 53, 17: 51, 26: 52}
+    assert S.NLCD_VOTE[22] == S.NLCD_VOTE[23] == S.NLCD_VOTE[24] == 20
+    assert S.NLCD_VOTE[250] is S.VOTE_NODATA and S.NLCD_VOTE[72] == S.VOTE_NONE == 0
+    assert S.NLCD_VOTE[12] == 12 and S.vote_code(12, 0) == 12  # D60: ice and snow is a code
+    assert S.vote_code(41, 5) == 33 and S.vote_code(22, 0) == 20 and S.vote_code(72, 2) == 20
+    assert S.vote_code(41, 2) == 41 and S.vote_code(250, 0) is None and S.vote_code(72, 0) == 0
+    for nlcd, classf in ((41, 30), (41, -1), (0, 0), (41, True), (None, 0)):
+        with pytest.raises(ValueError):
+            S.vote_code(nlcd, classf)
+    assert [S.check_machine_code(c) for c in (0, 11, 96)] == [0, 11, 96]
+    assert S.check_vote_code(20) == 20 and S.check_vote_code(0) == 0
+    for bad in (20, 99, 15):
+        with pytest.raises(ValueError):
+            S.check_machine_code(bad)
+    for bad in (30, 99):
+        with pytest.raises(ValueError):
+            S.check_vote_code(bad)
+
+
+def test_prompt_labels_and_overlap_rule_constants():
+    """DS-30, DS-11: one prompt for each code (32), no prompt for code 0; label.min_overlap is in config.yaml (D51, D53)."""
+    assert list(S.PROMPTS) == list(S.CODE_LIST) and 0 not in S.PROMPTS
+    assert [entry.prompt for entry in S.CODES] == list(S.PROMPTS.values())
+    assert len(set(S.PROMPTS.values())) == 32
+    assert load_config()["label"]["min_overlap"] == 0.5
 
 
 def test_level1_rules():
     """DS-12, R3: level-1 code is the tens digit x 10, and 99 for wetlands (D27)."""
-    expected = {11: 10, 13: 10, 14: 10, 21: 20, 25: 20, 29: 20, 31: 30, 35: 30, 41: 40,
+    expected = {11: 10, 12: 10, 13: 10, 14: 10, 36: 30, 53: 50, 55: 50, 21: 20, 25: 20, 29: 20, 31: 30, 35: 30, 41: 40,
                 44: 40, 51: 50, 52: 50, 71: 70, 81: 80, 83: 80, 90: 99, 95: 99, 96: 99}
     for code, l1 in expected.items():
         assert S.level1(code) == l1, code
     for code in LEVEL1_EXPECTED:
         assert S.level1(code) == code
-    for bad in (0, 22, 12, 91, 100, -1, 60, 98):
+    for bad in (0, 22, 15, 56, 91, 100, -1, 60, 98):
         with pytest.raises(ValueError):
             S.level1(bad)
 
 
 def test_is_label_code():
-    """DS-12, R3: 35 label codes (27 codes and 8 level-1 codes); the two sets do not overlap."""
+    """DS-12, R3: 40 label codes (32 codes and 8 level-1 codes); the two sets do not overlap."""
     labels = {c for c in range(0, 128) if S.is_label_code(c)}
     assert labels == set(CODES_IN_ORDER) | set(LEVEL1_EXPECTED)
-    assert len(labels) == 35
+    assert len(labels) == 40
     assert not set(CODES_IN_ORDER) & set(LEVEL1_EXPECTED)
-    for bad in (0, 22, 23, 24, 12, 91, 250):
+    for bad in (0, 22, 23, 24, 15, 56, 91, 250):
         assert not S.is_label_code(bad)
 
 
 def test_derived_nlcd_codes_and_colours():
-    """DS-13, DS-14, R3: DERIVED_NLCD has 16 output codes and the NLCD legend colours."""
+    """DS-13, DS-14, R3: DERIVED_NLCD has 17 output codes and the NLCD legend colours."""
     assert set(_codes_of(S.DERIVED_NLCD)) == DERIVED_CODES
     for code in DERIVED_CODES - {0}:
         assert S.colour(code).lower() == NLCD_LEGEND_EXPECTED[code], code
-    for bad in (1, 12, 40, 99, 250, -1):
+    for bad in (1, 15, 40, 99, 250, -1):
         with pytest.raises(ValueError):
             S.colour(bad)
     assert S.colour(13).lower() == "#5a86b8"
@@ -658,7 +695,7 @@ def test_derived_nlcd_limits():
 def test_derived_nlcd_input_errors():
     """DS-14, DS-20, R8: bad keys, values, sums and types raise."""
     f = S.derived_nlcd
-    for key in (0, 22, 23, 24, 40, 99, 10, 12, 250):
+    for key in (0, 22, 23, 24, 40, 99, 10, 15, 56, 250):
         with pytest.raises(ValueError):
             f({key: 1.0}, 1.0)
     for v in (-0.1, 1.1, float("nan"), float("inf"), -float("inf")):
@@ -691,7 +728,7 @@ def test_derived_nlcd_input_errors():
 
 
 def test_usace_m_map_complete():
-    """DS-16: the map has one row for each of the 27 codes (22 fixed targets, 5 tree codes)."""
+    """DS-16: the map has one row for each of the 32 codes (27 fixed targets, 5 tree codes)."""
     assert dict(S.USACE_M_MAP) == USACE_M_MAP_EXPECTED
     assert set(S.USACE_M_MAP) | set(TREE_CODES) == set(CODES_IN_ORDER)
     assert not set(S.USACE_M_MAP) & set(TREE_CODES)
@@ -1011,20 +1048,20 @@ def test_results_files_are_small():
 
 
 def test_record_columns():
-    """DS-20, DS-11, DS-14, DS-15: the cell record has 164 columns in a fixed order."""
+    """DS-20, DS-11, DS-14, DS-15: the cell record has 169 columns in a fixed order."""
     cols = S.record_columns()
     assert isinstance(cols, list)
-    assert len(cols) == 164 and len(set(cols)) == 164
+    assert len(cols) == 169 and len(set(cols)) == 169
     assert cols[:8] == ["cell_id", "row", "col", "pid", "chunk", "naip_year", "naip_date",
                         "photo_share"]
-    assert cols[8:35] == [f"share_{c}" for c in CODES_IN_ORDER]
-    assert cols[35:40] == ["top_code", "n_poly", "nlcd_derived", "usace_m_derived",
+    assert cols[8:40] == [f"share_{c}" for c in CODES_IN_ORDER]
+    assert cols[40:45] == ["top_code", "n_poly", "nlcd_derived", "usace_m_derived",
                            "usace_m_flags"]
     years = range(1985, 2026)
-    assert cols[40:81] == [f"nlcd_{y}" for y in years]
-    assert cols[81:122] == [f"classf_{y}" for y in years]
-    assert cols[122:163] == [f"tcc_{y}" for y in years]
-    assert cols[163] == "run_id"
+    assert cols[45:86] == [f"nlcd_{y}" for y in years]
+    assert cols[86:127] == [f"classf_{y}" for y in years]
+    assert cols[127:168] == [f"tcc_{y}" for y in years]
+    assert cols[168] == "run_id"
     assert "share_0" not in cols and "share_22" not in cols and "share_40" not in cols
 
 
@@ -1117,9 +1154,9 @@ def _test_docstrings():
 def test_every_ds_rule_has_test():
     """DS-1, DS-2, DS-3, DS-4, DS-5, DS-6, DS-7, DS-8, DS-9, DS-10, DS-11, DS-12, DS-13, DS-14,
     DS-15, DS-16, DS-17, DS-18, DS-19, DS-20, DS-21, DS-22, DS-23, DS-24, DS-25, DS-26, DS-27,
-    DS-28, FM-24: each DS ID of docs/DATA_STANDARD.md is in a test docstring or the mapping."""
+    DS-28, DS-29, DS-30, DS-31, DS-32, DS-33, DS-34, FM-24: each DS ID of docs/DATA_STANDARD.md is in a test docstring or the mapping."""
     ids = re.findall(r"^\| (DS-\d+) \|", _doc_text(), re.MULTILINE)
-    assert ids == [f"DS-{n}" for n in range(1, 29)]
+    assert ids == [f"DS-{n}" for n in range(1, 35)]
     docs = _test_docstrings()
     in_docstrings = set()
     for name, doc in docs.items():
@@ -1142,3 +1179,213 @@ def test_every_ds_rule_has_test():
     # each test docstring starts with an ID (DS, R or FM)
     for name, doc in docs.items():
         assert re.match(r"(DS|R|FM)-?\d+", doc), name
+
+
+# ---------------------------------------------------------------- D60: categories from METHOD_v1
+
+
+def test_new_codes_in_derived_codes():
+    """DS-14, DS-15, DS-16, D60: codes 12, 36, 53, 54, 55 in the derived NLCD and USACE-M codes."""
+    n, m = S.derived_nlcd, S.derived_usace_m
+    assert n({12: 1.0}, 1.0) == 12 and m({12: 1.0}, 1.0) == 3
+    assert n({36: 1.0}, 1.0) == 31 and m({36: 1.0}, 1.0) == 6
+    for code in (53, 54, 55):
+        assert n({code: 1.0}, 1.0) == 52
+    assert S.level1(12) == 10 and S.colour(12) == "#d1def8"
+    assert S.DERIVED_NLCD[12].name == "Perennial ice/snow"
+
+
+def test_usace_m_shrub_target():
+    """DS-15, DS-16, D60: shrub codes 52 to 55 are one target; leaf type from 53, 54, 55."""
+    f = S.derived_usace_m
+    assert [f({c: 1.0}, 1.0) for c in (52, 53, 54, 55)] == [26, 16, 15, 14]
+    # the shrub codes sum: 0.3 + 0.3 beats 0.4 grass
+    assert f({53: 0.3, 54: 0.3, 71: 0.4}, 1.0) == 14  # tie of 53 and 54 -> mixed
+    assert f({53: 0.2, 54: 0.2, 55: 0.2, 71: 0.4}, 1.0) == 14  # tie of three -> mixed
+    assert f({53: 0.31, 54: 0.29, 71: 0.4}, 1.0) == 16
+    assert f({54: 0.31, 53: 0.29, 71: 0.4}, 1.0) == 15
+    assert f({55: 0.31, 53: 0.29, 71: 0.4}, 1.0) == 14
+    # 52 is not a leaf type: 53 wins even with a larger 52
+    assert f({52: 0.5, 53: 0.1, 71: 0.4}, 1.0) == 16
+    assert f({52: 0.3, 11: 0.3, 71: 0.4}, 1.0) == 10  # 52 alone at 0.3 < 0.4
+    assert f({52: 0.6, 71: 0.4}, 1.0) == 26
+    # a tie with another target: the shrub target counts as the code of its result
+    assert f({52: 0.5, 51: 0.5}, 1.0) == 17  # 17 < 26
+    assert f({55: 0.5, 51: 0.5}, 1.0) == 14  # 14 < 17
+    assert f({53: 0.5, 71: 0.5}, 1.0) == 10  # 10 < 16
+    # the shrub step needs T < 0.10
+    assert f({53: 0.85, 41: 0.15}, 1.0) == 21
+
+
+def test_usace_m_stack_flags():
+    """DS-16, DS-20, D60: bits 2 (F2) and 4 (F3) come from the stack value; other bits are not copied."""
+    g = S.usace_m_flags
+    assert (S.FLAG_INTRODUCED, S.FLAG_DRAWDOWN) == (2, 4)
+    assert g({71: 1.0}, 1.0, 2) == 2 and g({71: 1.0}, 1.0, 4) == 4
+    assert g({71: 1.0}, 1.0, 6) == 6
+    assert g({71: 1.0}, 1.0, 1 | 8 | 16) == 0  # F1, CONFLICT, UNCONFIRMED: not copied
+    assert g({71: 1.0}, 1.0, 255) == 6
+    assert g({90: 1.0}, 1.0, 4) == 5  # photo F1 and stack F3
+    assert g({21: 1.0}, 1.0, 2) == 130
+    assert g({}, 0, 4) == 4  # kept without a photo
+    assert g({71: 1.0}, 1.0) == 0
+    for bad in (-1, 256, 2.0, True, None, "2"):
+        with pytest.raises(ValueError):
+            g({71: 1.0}, 1.0, bad)
+
+
+def test_change_groups():
+    """DS-31, D60: the 11 change groups of the 29 raster codes; code 0 has none; others raise."""
+    expected = {1: "W", 29: "W", 2: "D", 3: "X", 4: "SP", 5: "SP", 6: "SP", 7: "SP", 25: "SP",
+                8: "AB", 9: "EM", 10: "H", 11: "H", 12: "AG", 13: "AG", 14: "S", 15: "S",
+                16: "S", 17: "S", 26: "S", 18: "TO", 19: "TO", 20: "TO", 21: "TO", 27: "TO",
+                22: "TC", 23: "TC", 24: "TC", 28: "TC"}
+    assert {c: S.change_group(c) for c in range(1, 30)} == expected
+    assert S.change_group(0) is None
+    assert S.VEG_GROUPS == {"SP", "EM", "H", "S", "TO", "TC"}
+    for bad in (30, -1, 255, 1.0, True, None):
+        with pytest.raises(ValueError):
+            S.change_group(bad)
+
+
+def test_change_groups_match_scheme():
+    """DS-31, DS-33, D60, D3: the groups, the assessed set and the F2, F3 bits agree with scheme.py (text)."""
+    tree, classes = _scheme_code_for_all()
+    for code, row in classes.items():
+        group = row[3]
+        if code in (18, 19, 20, 21, 27):
+            group = "TO"
+        elif code in (22, 23, 24, 28):
+            group = "TC"
+        elif group == "NV":
+            group = "SP"  # usace-landuse change GROUP11[7] = "SP"
+        assert S.change_group(code) == group, code
+    assert set(_scheme_value(tree, "ASSESSED")) == S.ASSESSED
+    assert _scheme_value(tree, "F2_INTRODUCED") == S.FLAG_INTRODUCED
+    assert _scheme_value(tree, "F3_DRAWDOWN") == S.FLAG_DRAWDOWN
+
+
+def test_change_category_each_rule():
+    """DS-32, D60: one pair for each category, in the rule order."""
+    f = S.change_category
+    cases = {
+        (0, 24): 0, (24, 0): 0, (0, 0): 0,
+        (24, 24): 1, (1, 1): 1,
+        (10, 9): 3, (4, 9): 3, (1, 8): 3,
+        (9, 10): 4, (9, 25): 4, (8, 1): 4,
+        (21, 19): 11, (24, 23): 11, (1, 29): 11, (2, 2): 1, (14, 26): 11, (12, 13): 11,
+        (24, 1): 5, (2, 1): 5, (12, 29): 5,
+        (1, 4): 6, (29, 25): 6,
+        (1, 9): 7, (1, 10): 7, (29, 11): 7,
+        (1, 2): 8, (1, 24): 8, (1, 13): 8, (1, 3): 8, (1, 16): 8,
+        (21, 24): 9, (18, 28): 9,
+        (24, 21): 10, (28, 18): 10,
+        (10, 16): 12, (10, 21): 12, (11, 24): 12, (16, 24): 12, (17, 18): 12, (4, 10): 12,
+        (25, 24): 12, (9, 16): 12, (9, 24): 12, (9, 21): 12,
+        (24, 16): 13, (21, 10): 13, (16, 10): 13, (24, 4): 13, (10, 25): 13, (16, 5): 13,
+        (24, 2): 14, (9, 2): 14, (4, 2): 14,
+        (24, 3): 15, (10, 3): 15,
+        (24, 13): 16, (9, 12): 16,
+        (12, 10): 17, (13, 24): 17, (12, 9): 17,
+        (2, 10): 18, (3, 24): 18, (3, 4): 18,
+        (24, 9): 19, (8, 10): 19, (2, 3): 19, (12, 2): 19, (3, 12): 19, (8, 2): 19, (16, 9): 19,
+    }
+    for (a, b), cat in cases.items():
+        assert f(a, b) == cat, (a, b)
+    assert set(cases.values()) == set(S.CHANGE_CATEGORIES) - {2}  # 2 needs confirmed=False
+    assert len(S.CHANGE_CATEGORIES) == 20
+
+
+def test_change_category_unconfirmed_and_errors():
+    """DS-32, D60: an unconfirmed change is 2 before all other rules; persistence and no data first."""
+    f = S.change_category
+    assert f(24, 2, confirmed=False) == 2
+    assert f(1, 8, confirmed=False) == 2
+    assert f(24, 24, confirmed=False) == 1
+    assert f(0, 24, confirmed=False) == 0
+    for bad in (1, 0, None, "yes"):
+        with pytest.raises(ValueError):
+            f(24, 2, confirmed=bad)
+    for a, b in ((30, 1), (1, 30), (1.0, 1), (True, 1)):
+        with pytest.raises(ValueError):
+            f(a, b)
+
+
+def test_change_category_all_pairs():
+    """DS-32, DS-31, D60: every pair of the 30 raster codes gives one category of the table."""
+    seen = set()
+    for a in range(30):
+        for b in range(30):
+            cat = S.change_category(a, b)
+            assert cat in S.CHANGE_CATEGORIES
+            seen.add(cat)
+            if a and b and a != b and S.change_group(a) == S.change_group(b):
+                assert cat == 11, (a, b)
+    assert seen == set(S.CHANGE_CATEGORIES) - {2}
+
+
+def test_condition_state_limits():
+    """DS-33, D60: the rating limits, the state of each rating, not assessed and no data."""
+    r = S.condition_rating
+    assert [r(v) for v in (5.0, 4.5, 4.499, 3.5, 3.499, 2.0, 1.999, 1.0)] == list("AABBCCDD")
+    assert r(4.4999999999) == "A"  # rounded to 9 decimals first
+    assert r(4) == "B"
+    st = S.condition_state
+    assert [st(24, v) for v in (4.5, 3.5, 3.499, 2.0, 1.999)] == [1, 1, 2, 2, 3]
+    for code in (1, 2, 3, 7, 8, 12, 13, 25, 29):
+        assert st(code) == 4, code
+        with pytest.raises(ValueError):
+            st(code, 3.0)
+    assert st(0) == 0
+    for code in S.ASSESSED:
+        with pytest.raises(ValueError):
+            st(code)
+    for bad in (0.999, 5.001, -1, float("nan"), float("inf"), "3", None, True):
+        with pytest.raises(ValueError):
+            r(bad)
+    for bad in (30, -1, 2.0):
+        with pytest.raises(ValueError):
+            st(bad)
+    assert S.CONDITION_STATES == {0: "No data", 1: "Sustainable", 2: "Transitioning",
+                                  3: "Degraded", 4: "Not assessed"}
+
+
+def test_trend_slope_and_trajectory():
+    """DS-34, D60: Theil-Sen slope of 6 years; the +-0.1 limits; not available; newly assessed."""
+    t = S.trend_slope
+    assert t([3, 3.1, 3.2, 3.3, 3.4, 3.5]) == 0.1
+    assert t([4, 3.9, 3.8, 3.7, 3.6, 3.5]) == -0.1
+    assert t([3, 3, 3, 3, 3, 3]) == 0
+    assert t([3, 3, 3, 3, 3, 5]) == 0  # one outlier does not move the median
+    assert t((1, 2, 3, 4, 5, 5)) == 1.0
+    for bad in ([3] * 5, [3] * 7, [], "333333", 3, None, [3, 3, 3, 3, 3, "3"],
+                [3, 3, 3, 3, 3, float("nan")]):
+        with pytest.raises(ValueError):
+            t(bad)
+    j = S.trajectory
+    assert [j(v) for v in (0.1, 0.0999999, 0, -0.0999999, -0.1, 0.5, -0.5)] == [1, 2, 2, 2, 3, 1, 3]
+    assert j(0.09999999999) == 1  # rounded to 9 decimals first
+    assert j(None) == 0
+    assert j(None, assessed_before=False) == 1
+    assert j(-0.5, assessed_before=False) == 1
+    for bad in ("0.1", True, float("nan")):
+        with pytest.raises(ValueError):
+            j(bad)
+    with pytest.raises(ValueError):
+        j(0.1, assessed_before=None)
+    assert S.TRAJECTORIES == {0: "Not available", 1: "Recovering", 2: "Stable", 3: "Declining"}
+    assert (S.TREND_WINDOW, S.TREND_LIMIT) == (6, 0.1)
+
+
+def test_score_change():
+    """DS-34, D60: the +-0.5 limits of the score change; the scores must be 1 to 5."""
+    c = S.score_change
+    assert c(3.0, 3.5) == 1 and c(3.0, 3.4999) == 2 and c(3.0, 3.0) == 2
+    assert c(3.5, 3.0) == 3 and c(3.4999, 3.0) == 2
+    assert c(1.0, 5.0) == 1 and c(5.0, 1.0) == 3
+    assert c(3.1, 3.6) == 1  # binary error: 3.6 - 3.1 = 0.5000000000000004, rounded to 0.5
+    assert c(3.6, 3.1) == 3
+    for a, b in ((0.5, 3), (3, 5.5), (None, 3), (3, "3")):
+        with pytest.raises(ValueError):
+            c(a, b)
+    assert S.SCORE_CHANGES == {1: "Improved", 2: "Unchanged", 3: "Declined"}

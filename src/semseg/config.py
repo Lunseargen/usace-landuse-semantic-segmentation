@@ -39,6 +39,43 @@ def non_negative_number(value):
             and math.isfinite(value) and value >= 0)
 
 
+LABEL_MODEL_IDS = ("sam2-hiera-tiny", "sam2-hiera-small", "sam2-hiera-base-plus", "sam2-hiera-large")
+LABEL_DEFAULTS = {"model_id": "sam2-hiera-large", "box_threshold": 0.25, "text_threshold": 0.25,
+                  "min_overlap": 0.5}
+
+
+def _real(value):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value))
+
+
+def label_settings(section):
+    """Return the `label` settings (D51 item 7) as a dict of the 4 keys. A missing key takes its default.
+
+    `section` is the `label` mapping or None. Raise ValueError for a value that is not valid.
+    """
+    if section is None:
+        section = {}
+    if not isinstance(section, dict):
+        raise ValueError("config label must be a mapping")
+    out = {**LABEL_DEFAULTS, **{k: v for k, v in section.items() if k in LABEL_DEFAULTS}}
+    for key in ("box_threshold", "text_threshold"):
+        if not _real(out[key]) or not 0 < out[key] <= 1:
+            raise ValueError(f"config label.{key} must be a number with 0 < value <= 1, got {out[key]!r}")
+    if not _real(out["min_overlap"]) or not 0 <= out["min_overlap"] <= 1:
+        raise ValueError(f"config label.min_overlap must be a number from 0 to 1, got {out['min_overlap']!r}")
+    if out["model_id"] not in LABEL_MODEL_IDS:
+        raise ValueError(f"config label.model_id must be one of {LABEL_MODEL_IDS}, got {out['model_id']!r}")
+    return out
+
+
+def _check_label(path, section):
+    """Check the optional `label` section (D51)."""
+    try:
+        label_settings(section)
+    except ValueError as exc:
+        raise ConfigError(f"{path}: {exc}") from exc
+
+
 def _check_segment(path, seg):
     """Check the optional `segment` section (D47). A missing key is allowed."""
     if not isinstance(seg, dict):
@@ -82,6 +119,8 @@ def _check(path, data):
         raise ConfigError(f"{path}: aois must be a non-empty list of integers")
     if "segment" in data:
         _check_segment(path, data["segment"])
+    if "label" in data:
+        _check_label(path, data["label"])
     if "demo" in data:
         _check_demo(path, data["demo"])
 
