@@ -1,0 +1,1093 @@
+{
+  "S0": {
+    "input": [
+      [
+        "a",
+        "PLAN interview\n(DECISIONS.md)"
+      ],
+      [
+        "b",
+        "`fine_grid` features\n(survey 2026-11-11)"
+      ],
+      [
+        "c",
+        "`usace-landuse` stack\nand `fine_grid_test` (read only)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "write the rules `DS-<n>`\n→ code them in `standard.py`"
+      ],
+      [
+        "p2",
+        "list each data set\n→ check it"
+      ],
+      [
+        "p3",
+        "repository set-up\n→ set-up check"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`docs/DATA_STANDARD.md`\n+ `semseg.standard`"
+      ],
+      [
+        "o2",
+        "`data/REGISTRY.toml`\nregistry check passes"
+      ],
+      [
+        "o3",
+        "`pyproject.toml`, venv\n`results/setup_check.json`"
+      ]
+    ],
+    "edges": "a>p1 b>p3 c>p2 p1>o1 p2>o2 p3>o3"
+  },
+  "0.1": {
+    "input": [
+      [
+        "a",
+        "`fine_grid` `pyproject.toml`\n(torch cu130, aarch64)"
+      ],
+      [
+        "b",
+        "samgeo 1.4.2\n[samgeo2,text]"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "`uv sync --python 3.12`\n→ package `src/semseg/` → pytest"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`pyproject.toml`, `uv.lock`\n`config.yaml`, `tests/`"
+      ],
+      [
+        "o2",
+        "`README.md`, `CLAUDE.md`\npointers to the plan"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: repository set-up"
+    }
+  },
+  "0.2": {
+    "input": [
+      [
+        "a",
+        "`docs/DATA_STANDARD.md`\nDS-1 to DS-28"
+      ],
+      [
+        "b",
+        "`usace-landuse` `scheme.py`\n(USACE-M codes)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "grid math: cell, chunk, pixel\n→ IDs and round trips"
+      ],
+      [
+        "p2",
+        "code table, colours\n→ NLCD and USACE-M maps"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`src/semseg/standard.py`\none function for each rule"
+      ],
+      [
+        "o2",
+        "`tests/test_standard.py`\none test for each DS rule"
+      ]
+    ],
+    "edges": "a>p1 a>p2 b>p2 p1>o1 p2>o1 p1>o2 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.standard`"
+    }
+  },
+  "0.3": {
+    "input": [
+      [
+        "a",
+        "`data/REGISTRY.toml`\nroots and data sets"
+      ],
+      [
+        "b",
+        "GPU, imports,\npilot layers"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "share guard → safe write\n→ read-only roots"
+      ],
+      [
+        "p2",
+        "set-up check\n→ `HF_HOME` on the share"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`src/semseg/storage.py`"
+      ],
+      [
+        "o2",
+        "`results/setup_check.json`\nGPU free, layers, NAIP count"
+      ]
+    ],
+    "edges": "a>p1 a>p2 b>p2 p1>o1 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.storage`, `semseg.setup_check`"
+    }
+  },
+  "S1": {
+    "input": [
+      [
+        "a",
+        "NAIP 2022 chunks\n(6 chunks of 77)"
+      ],
+      [
+        "b",
+        "stack layers\n`nlcd`, `classf`, `tcc`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "chunk grid → SAM 2 polygons"
+      ],
+      [
+        "p2",
+        "label: text prompts\n+ map vote"
+      ],
+      [
+        "p3",
+        "30 m composition\n→ agreement tables"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`polygons/<chunk>.gpkg`"
+      ],
+      [
+        "o2",
+        "`cells/<chunk>.parquet`\n+ 30 m rasters"
+      ],
+      [
+        "o3",
+        "`results/demo/`\nagreement + pictures"
+      ]
+    ],
+    "edges": "a>p1 a>p2 b>p2 b>p3 p1>o1 p2>o1 p3>o2 p3>o3"
+  },
+  "1.1": {
+    "input": [
+      [
+        "a",
+        "`boundary.gpkg`\n(footprint, EPSG:5070)"
+      ],
+      [
+        "b",
+        "`fine_grid` `chunks.csv`\n(check only)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "buffer 150 m → chunks that touch it\n→ IDs `r<row>_c<col>`"
+      ],
+      [
+        "p2",
+        "compare with `chunks.csv`"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`<pid>/chunks.parquet`"
+      ],
+      [
+        "o2",
+        "test: same chunk IDs\nas `fine_grid`"
+      ]
+    ],
+    "edges": "a>p1 b>p2 p1>o1 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.grid`"
+    }
+  },
+  "1.2": {
+    "titles": {
+      "P": "Process: `semseg.segment`"
+    },
+    "input": [
+      [
+        "a",
+        "NAIP chunk\n1920 × 1920, 0.5 m"
+      ],
+      [
+        "b",
+        "SAM 2 weights\n(`HF_HOME` on the share)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "GPU memory check → SAM 2 masks\n→ polygons (clip, simplify, area)"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`polygons/<chunk>.gpkg`\nlayer `polygons`"
+      ],
+      [
+        "o2",
+        "`runs/<run_id>/log`\ntime, GPU memory"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1 p1>o2"
+  },
+  "1.3": {
+    "input": [
+      [
+        "a",
+        "`polygons/<chunk>.gpkg`"
+      ],
+      [
+        "b",
+        "NAIP chunk"
+      ],
+      [
+        "c",
+        "code table\n(prompt for each code)"
+      ],
+      [
+        "d",
+        "`nlcd_2022`, `classf_2022`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "LangSAM: one prompt for each code\n→ mask overlap with each polygon"
+      ],
+      [
+        "p2",
+        "map vote: majority code\nunder each polygon"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "columns `code_prompt`, `p_prompt`"
+      ],
+      [
+        "o2",
+        "columns `code_vote`, `p_vote`"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 a>p2 d>p2 p1>o1 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.label`"
+    }
+  },
+  "1.4": {
+    "input": [
+      [
+        "a",
+        "labelled polygons"
+      ],
+      [
+        "b",
+        "stack history\n1985–2025"
+      ],
+      [
+        "c",
+        "NAIP `source_rank`\nand tags"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "rasterise at 0.5 m → shares\nfor each 30 m cell → top code"
+      ],
+      [
+        "p2",
+        "derived NLCD (DS-14)\nand USACE-M (DS-15)"
+      ],
+      [
+        "p3",
+        "join history and sources"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`cells/<chunk>.parquet`\n(DS-20)"
+      ],
+      [
+        "o2",
+        "`rasters/top.tif`, `shares.tif`\n`nlcd_derived.tif`"
+      ]
+    ],
+    "edges": "a>p1 a>p2 b>p3 c>p3 p1>o1 p1>o2 p2>o1 p2>o2 p3>o1",
+    "titles": {
+      "P": "Process: `semseg.cells`"
+    }
+  },
+  "1.5": {
+    "input": [
+      [
+        "a",
+        "`cells/<chunk>.parquet`"
+      ],
+      [
+        "b",
+        "`polygons/<chunk>.gpkg`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "agreement with NLCD 2022\nand `classf_2022` → confusion"
+      ],
+      [
+        "p2",
+        "count of polygons for each code\n→ codes with 0"
+      ],
+      [
+        "p3",
+        "picture of each chunk"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`results/demo/agreement.csv`"
+      ],
+      [
+        "o2",
+        "`results/demo/codes.csv`"
+      ],
+      [
+        "o3",
+        "`results/demo/*.png`\n+ `README.md`"
+      ]
+    ],
+    "edges": "a>p1 b>p2 b>p3 p1>o1 p2>o2 p3>o3",
+    "titles": {
+      "P": "Process: `semseg.demo_report`"
+    }
+  },
+  "S2": {
+    "input": [
+      [
+        "a",
+        "polygons + NAIP"
+      ],
+      [
+        "b",
+        "accounts (admin)"
+      ],
+      [
+        "c",
+        "evaluation sample"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "server + login"
+      ],
+      [
+        "p2",
+        "map page: contours\n→ click → class"
+      ],
+      [
+        "p3",
+        "blind mode"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`var/app.sqlite`\naccounts, labels"
+      ],
+      [
+        "o2",
+        "`labels/*.gpkg`\nexports"
+      ]
+    ],
+    "edges": "b>p1 a>p2 c>p3 p1>o1 p2>o1 p3>o1 p2>o2"
+  },
+  "2.1": {
+    "input": [
+      [
+        "a",
+        "`USDA-LFD-LLM` `queue_server.py`\n(login pattern)"
+      ],
+      [
+        "b",
+        "`vllmPortal` `portal.py`\n(server pattern)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "stdlib server, port 8795\n→ argon2id, bearer tokens, roles\n→ rate limit"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`src/semseg/app/server.py`\n`store.py`"
+      ],
+      [
+        "o2",
+        "`var/app.sqlite`\nusers, sessions"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: `semseg.app`"
+    }
+  },
+  "2.2": {
+    "input": [
+      [
+        "a",
+        "NAIP chunks"
+      ],
+      [
+        "b",
+        "`polygons/<chunk>.gpkg`"
+      ],
+      [
+        "c",
+        "`vllmPortal` design tokens"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "image tiles from the chunks"
+      ],
+      [
+        "p2",
+        "polygons as GeoJSON contours"
+      ],
+      [
+        "p3",
+        "page: Leaflet (vendored)\n+ green design"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`/label` page"
+      ],
+      [
+        "o2",
+        "`static/leaflet/`"
+      ]
+    ],
+    "edges": "a>p1 b>p2 c>p3 p1>o1 p2>o1 p3>o1 p3>o2",
+    "titles": {
+      "P": "Process: map page"
+    }
+  },
+  "2.3": {
+    "input": [
+      [
+        "a",
+        "a click on a polygon"
+      ],
+      [
+        "b",
+        "code table, 2 levels"
+      ],
+      [
+        "c",
+        "table `labels`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "select the code → save\n→ undo"
+      ],
+      [
+        "p2",
+        "merge, cut, draw by hand"
+      ],
+      [
+        "p3",
+        "export (nightly, admin)"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "table `labels`\n(labeler, time, NAIP year, geometry)"
+      ],
+      [
+        "o2",
+        "`labels/<date>.gpkg`"
+      ]
+    ],
+    "edges": "a>p1 b>p1 a>p2 c>p3 p1>o1 p2>o1 p3>o2",
+    "titles": {
+      "P": "Process: label tools"
+    }
+  },
+  "2.4": {
+    "input": [
+      [
+        "a",
+        "`sample/*.gpkg`"
+      ],
+      [
+        "b",
+        "role of the user"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "sample queue → cell only\n→ hide model, NLCD, USACE-M"
+      ],
+      [
+        "p2",
+        "results for admin only"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "table `labels`, mode `eval`"
+      ],
+      [
+        "o2",
+        "test: the API sends\nno prediction field in eval mode"
+      ]
+    ],
+    "edges": "a>p1 b>p1 b>p2 p1>o1 p1>o2 p2>o2",
+    "titles": {
+      "P": "Process: blind mode"
+    }
+  },
+  "S3": {
+    "input": [
+      [
+        "a",
+        "`cells/*.parquet`"
+      ],
+      [
+        "b",
+        "labels (training, eval)"
+      ],
+      [
+        "c",
+        "`results/eval/`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "tables: agreement, confusion,\narea for each code"
+      ],
+      [
+        "p2",
+        "charts: pie + treemap\n→ cell record"
+      ],
+      [
+        "p3",
+        "disagreement list"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`/analysis` page"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 a>p2 a>p3 p1>o1 p2>o1 p3>o1"
+  },
+  "3.1": {
+    "input": [
+      [
+        "a",
+        "`cells/*.parquet`"
+      ],
+      [
+        "b",
+        "labels (training)"
+      ],
+      [
+        "c",
+        "`results/eval/*.csv`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "agreement with NLCD and USACE-M\n→ confusion matrix"
+      ],
+      [
+        "p2",
+        "area for each code and project"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "API `/api/analysis/*`\n+ tables on the page"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 a>p2 p1>o1 p2>o1",
+    "titles": {
+      "P": "Process: analysis tables"
+    }
+  },
+  "3.2": {
+    "input": [
+      [
+        "a",
+        "cell record (DS-20)"
+      ],
+      [
+        "b",
+        "code colours (DS-13)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "pie (donut) of the composition"
+      ],
+      [
+        "p2",
+        "treemap (squarified)\ncell, chunk, project"
+      ],
+      [
+        "p3",
+        "history timeline\n1985–2025"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "inline SVG charts\n+ cell panel"
+      ]
+    ],
+    "edges": "a>p1 b>p1 a>p2 b>p2 a>p3 p1>o1 p2>o1 p3>o1",
+    "titles": {
+      "P": "Process: composition charts"
+    }
+  },
+  "3.3": {
+    "input": [
+      [
+        "a",
+        "cell records"
+      ],
+      [
+        "b",
+        "stack codes"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "cells where the sources disagree\n→ sort by area → link to `/label`"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "disagreement list"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1",
+    "titles": {
+      "P": "Process: disagreement list"
+    }
+  },
+  "S4": {
+    "input": [
+      [
+        "a",
+        "NAIP + sources\n(77: 157, 392: 227 chunks)"
+      ],
+      [
+        "b",
+        "training labels"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "fetch the missing chunks"
+      ],
+      [
+        "p2",
+        "baselines B0, B1"
+      ],
+      [
+        "p3",
+        "segment → label → classify\n→ cells (all chunks)"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`sources/`, `baselines/`"
+      ],
+      [
+        "o2",
+        "`polygons/`, `cells/`, `rasters/`\nfor both pilots"
+      ],
+      [
+        "o3",
+        "`models/polygon_classifier/`"
+      ]
+    ],
+    "edges": "a>p1 a>p2 a>p3 b>p3 p1>o1 p2>o1 p3>o2 p3>o3"
+  },
+  "4.1": {
+    "input": [
+      [
+        "a",
+        "`chunks.parquet`"
+      ],
+      [
+        "b",
+        "`fine_grid_test` files\n(read only)"
+      ],
+      [
+        "c",
+        "Planetary Computer, AWS,\nMicrosoft buildings"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "for each chunk and source: exists?\n→ fetch only the missing\n→ safe write, resume, log"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`sources/<source>/<chunk>.tif`"
+      ],
+      [
+        "o2",
+        "`runs/<run_id>/fetch.csv`"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: `semseg.fetch`"
+    }
+  },
+  "4.2": {
+    "input": [
+      [
+        "a",
+        "stack `classf_2022`, `nlcd_2022`"
+      ],
+      [
+        "b",
+        "buildings, roads, CHM, NDVI,\nwater vectors"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "B0: copy the 30 m map"
+      ],
+      [
+        "p2",
+        "B1: rules on the ready layers"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`baselines/b0/<chunk>.parquet`"
+      ],
+      [
+        "o2",
+        "`baselines/b1/<chunk>.parquet`"
+      ]
+    ],
+    "edges": "a>p1 b>p2 p1>o1 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.baselines`"
+    }
+  },
+  "4.3": {
+    "input": [
+      [
+        "a",
+        "polygons + NAIP + heights"
+      ],
+      [
+        "b",
+        "training labels\n(`labels/*.gpkg`)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "features: bands, NDVI, texture,\nheight, shape, prompt and vote"
+      ],
+      [
+        "p2",
+        "train → cross-validate by chunk"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`models/polygon_classifier/`"
+      ],
+      [
+        "o2",
+        "column `code_clf`, `p_clf`"
+      ]
+    ],
+    "edges": "a>p1 b>p2 p1>o2 p2>o1",
+    "titles": {
+      "P": "Process: `semseg.classify`"
+    }
+  },
+  "4.4": {
+    "input": [
+      [
+        "a",
+        "all chunks of 77 and 392"
+      ],
+      [
+        "b",
+        "classifier model"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "segment → label → classify\n→ cells, resume by chunk"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`polygons/`, `cells/`, `rasters/`\n(both pilots)"
+      ],
+      [
+        "o2",
+        "`runs/<run_id>/`\ntime, GPU memory"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: `semseg.run`"
+    }
+  },
+  "S5": {
+    "input": [
+      [
+        "a",
+        "cell records\n(predicted level-1 code)"
+      ],
+      [
+        "b",
+        "blind labels"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "sample design (±5 %, 95 %)"
+      ],
+      [
+        "p2",
+        "Stehman estimator → gate"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`sample/*.gpkg`"
+      ],
+      [
+        "o2",
+        "`results/eval/`\naccuracy, area, gate"
+      ]
+    ],
+    "edges": "a>p1 b>p2 p1>o1 p2>o2"
+  },
+  "5.1": {
+    "input": [
+      [
+        "a",
+        "cells in the area of interest\n(footprint + 150 m)"
+      ],
+      [
+        "b",
+        "seed, margin, minimum per class"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "n from N (finite population)\n→ allocate by stratum (≥ 50)\n→ random cells"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`sample/<date>.gpkg`\nweights, order"
+      ],
+      [
+        "o2",
+        "sample queue in the app"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: `semseg.sample`"
+    }
+  },
+  "5.3": {
+    "input": [
+      [
+        "a",
+        "blind labels (mode `eval`)"
+      ],
+      [
+        "b",
+        "sample weights"
+      ],
+      [
+        "c",
+        "our codes, NLCD 2022,\n`classf_2022`"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "Stehman: overall, user, producer accuracy\n→ area with 95 % intervals"
+      ],
+      [
+        "p2",
+        "gate (D24)"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`results/eval/accuracy.csv`\n`area.csv`"
+      ],
+      [
+        "o2",
+        "`results/eval/gate.md`"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 c>p2 a>p2 p1>o1 p2>o2",
+    "titles": {
+      "P": "Process: `semseg.evaluate`"
+    }
+  },
+  "S6": {
+    "input": [
+      [
+        "a",
+        "training labels\n+ polygons"
+      ],
+      [
+        "b",
+        "NAIP"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "U-Net and DeepLab training\n→ inference → cells"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`models/cnn/`\n+ cell records (B6)"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1"
+  },
+  "6.1": {
+    "input": [
+      [
+        "a",
+        "labels + polygons"
+      ],
+      [
+        "b",
+        "NAIP chunks"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "rasterise labels\n→ tiles → split by chunk"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "training tiles on the share"
+      ]
+    ],
+    "edges": "a>p1 b>p1 p1>o1",
+    "titles": {
+      "P": "Process: training set"
+    }
+  },
+  "6.2": {
+    "input": [
+      [
+        "a",
+        "training tiles"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "U-Net, DeepLabv3+ (smp)\n→ inference → cells"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`models/cnn/`"
+      ],
+      [
+        "o2",
+        "cell records, method `cnn`"
+      ]
+    ],
+    "edges": "a>p1 p1>o1 p1>o2",
+    "titles": {
+      "P": "Process: CNN"
+    }
+  }
+}

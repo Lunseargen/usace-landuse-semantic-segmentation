@@ -1,0 +1,15 @@
+{
+  "plan": "PLAN.md",
+  "cards": "PLAN.ipo.json",
+  "checks": [
+    {
+      "name": "registry",
+      "run": "python3 /home/spdc_research/workspace/claude-config/skills/project-plan/scripts/registry_check.py data/REGISTRY.toml --plan PLAN.md",
+      "timeout": 120
+    }
+  ],
+  "stop_before": [
+    "deploy",
+    "push"
+  ]
+}

@@ -1,0 +1,296 @@
+# Data registry: one [[dataset]] table for each data set. Rules: docs/DATA_STANDARD.md.
+# Check (from the repository root):
+#   python3 ~/.claude/skills/project-plan/scripts/registry_check.py data/REGISTRY.toml --plan PLAN.md
+# status: present (must exist now), planned (a stage will write it), retired (kept for the record)
+# Exit code 3 = a root does not exist: the lab share is not mounted. Stop; do not write the data elsewhere.
+
+[roots]
+share = "/run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data"
+semseg = "{share}/usace-landuse-semseg"                  # this project: read and write (DS-23)
+fgt = "{share}/usace-landuse/fine_grid_test"             # fine_grid data: read only
+stack = "~/workspace/usace-landuse/USACE/01_Data/stack"  # usace-landuse 30 m stack: read only
+repo = "."                                               # this repository (run the check from its root)
+
+# ---- inputs that exist now (read only) ----
+
+[[dataset]]
+id = "naip_2022"
+title = "NAIP 2022 chunks, 0.5 m, 5 bands (red, green, blue, nir, source_rank)"
+path = "{fgt}/{pid}/naip/r*_c*.tif"
+kind = "raster"
+status = "present"
+min_files = 384            # 77: 157, 392: 227 (2026-11-11)
+writer = "external"
+readers = ["1.2", "1.3", "2.2", "4.3", "4.4"]
+source = "Planetary Computer `naip`, fetched by usace-landuse fine_grid step 1 (2026-11-11)"
+standard = "DS-3, DS-4, DS-5"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "fg_chunks"
+title = "fine_grid chunk lists (chunk, row, col, bounds, footprint share)"
+path = "{fgt}/{pid}/chunks.csv"
+kind = "table"
+status = "present"
+min_files = 2
+writer = "external"
+readers = ["1.1"]
+source = "usace-landuse fine_grid grid.py"
+standard = "DS-3, DS-7"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "lidar_hag"
+title = "3DEP lidar height above ground, class, year (2 m)"
+path = "{fgt}/{pid}/lidar/r*_c*.tif"
+kind = "raster"
+status = "present"
+min_files = 384
+writer = "external"
+readers = ["4.2", "4.3"]
+source = "Planetary Computer `3dep-lidar-hag`, `3dep-lidar-classification`; years >= 2014"
+standard = "DS-1, DS-3"
+notes = "392: only 115 of 227 chunks have data"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "meta_chm"
+title = "Meta / WRI 1 m canopy height"
+path = "{fgt}/{pid}/ancillary/metachm/r*_c*.tif"
+kind = "raster"
+status = "present"
+min_files = 384
+writer = "external"
+readers = ["4.2", "4.3"]
+source = "dataforgood-fb-data alsgedi_global_v6_float"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "esri_lulc_2022"
+title = "Esri / Impact Observatory land cover 2022 (10 m)"
+path = "{fgt}/{pid}/ancillary/esri/r*_c*.tif"
+kind = "raster"
+status = "present"
+min_files = 384
+writer = "external"
+readers = ["4.2"]
+source = "Planetary Computer `io-lulc-annual-v02`"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "chesapeake_lc13"
+title = "Chesapeake Conservancy 13-class land cover 2013/14 (1 m), 392 only"
+path = "{fgt}/392_RAYSTOWN_LAKE/ancillary/chesapeake/r*_c*.tif"
+kind = "raster"
+status = "present"
+min_files = 227
+writer = "external"
+readers = ["4.2"]
+source = "Planetary Computer `chesapeake-lc-13`"
+notes = "older than NAIP 2022: a weak label only; never a test label"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "ms_buildings"
+title = "Microsoft building footprints"
+path = "{fgt}/{pid}/ancillary/ms_buildings.gpkg"
+kind = "vector"
+status = "present"
+min_files = 2
+writer = "external"
+readers = ["4.2", "4.3"]
+source = "minedbuildings global-buildings dataset-links.csv"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "stack_nlcd"
+title = "Annual NLCD land cover 1985-2025 on the 30 m grid"
+path = "{stack}/{pid}/nlcd_*.tif"
+kind = "raster"
+status = "present"
+min_files = 82
+writer = "external"
+readers = ["1.3", "1.4", "3.1"]
+source = "Annual NLCD C1V2 via usace-landuse build_stack"
+standard = "DS-2"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "stack_classf"
+title = "USACE-M class (final) 1985-2025 on the 30 m grid"
+path = "{stack}/{pid}/classf_*.tif"
+kind = "raster"
+status = "present"
+min_files = 82
+writer = "external"
+readers = ["1.3", "1.4", "3.1"]
+source = "usace-landuse classify"
+standard = "DS-2, DS-16"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "stack_tcc"
+title = "Tree canopy cover 1985-2025 on the 30 m grid"
+path = "{stack}/{pid}/tcc_*.tif"
+kind = "raster"
+status = "present"
+min_files = 82
+writer = "external"
+readers = ["1.4"]
+source = "USFS TCC v2025.6 via usace-landuse build_stack"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "stack_boundary"
+title = "Project footprint (active boundary), EPSG:5070"
+path = "{stack}/{pid}/boundary.gpkg"
+kind = "vector"
+status = "present"
+min_files = 2
+writer = "external"
+readers = ["1.1", "5.1"]
+source = "usace-landuse (NRM May 2021 geodatabase + Stage 1 corrections)"
+updated = "2026-11-11"
+
+[[dataset]]
+id = "stack_vectors"
+title = "OSM / TIGER / NID features (roads, buildings, water, paved, dam)"
+path = "{stack}/{pid}/vectors.gpkg"
+kind = "vector"
+status = "present"
+min_files = 2
+writer = "external"
+readers = ["4.2"]
+source = "usace-landuse vectors.py"
+updated = "2026-11-11"
+
+# ---- outputs of this project ----
+
+[[dataset]]
+id = "chunk_list"
+title = "Chunk list of each pilot (own grid code)"
+path = "{semseg}/{pid}/chunks.parquet"
+kind = "table"
+status = "planned"
+writer = "1.1"
+readers = ["1.2", "4.1", "4.4"]
+standard = "DS-3, DS-7"
+
+[[dataset]]
+id = "models_cache"
+title = "Model weights and the Hugging Face cache (SAM 2, Grounding DINO)"
+path = "{semseg}/models/*"
+kind = "model"
+status = "planned"
+writer = "0.3"
+readers = ["1.2", "1.3"]
+standard = "DS-28"
+
+[[dataset]]
+id = "polygons"
+title = "SAM 2 polygons with labels for each chunk"
+path = "{semseg}/{pid}/polygons/r*_c*.gpkg"
+kind = "vector"
+status = "planned"
+writer = "1.2"
+readers = ["1.3", "1.4", "2.2", "4.3"]
+standard = "DS-9, DS-18, DS-21"
+
+[[dataset]]
+id = "cells"
+title = "Cell records (composition, history, sources) for each chunk"
+path = "{semseg}/{pid}/cells/r*_c*.parquet"
+kind = "table"
+status = "planned"
+writer = "1.4"
+readers = ["1.5", "2.2", "3.1", "3.2", "5.1", "5.3"]
+standard = "DS-8, DS-20, DS-21"
+
+[[dataset]]
+id = "cell_rasters"
+title = "30 m rasters: top code, shares, derived NLCD and USACE-M codes"
+path = "{semseg}/{pid}/rasters/*.tif"
+kind = "raster"
+status = "planned"
+writer = "1.4"
+readers = ["2.2", "3.1"]
+standard = "DS-2, DS-14, DS-15, DS-17"
+
+[[dataset]]
+id = "demo_report"
+title = "Demo agreement tables (S1)"
+path = "{repo}/results/demo/*.csv"
+kind = "table"
+status = "planned"
+writer = "1.5"
+readers = ["3.1"]
+standard = "DS-19"
+
+[[dataset]]
+id = "app_db"
+title = "App database: accounts, sessions, labels, sample queue (local disk)"
+path = "{repo}/var/app.sqlite"
+kind = "db"
+status = "planned"
+writer = "2.1"
+readers = ["2.3", "2.4", "3.1", "5.3"]
+standard = "DS-27"
+
+[[dataset]]
+id = "label_exports"
+title = "Label exports (training and evaluation)"
+path = "{semseg}/{pid}/labels/*.gpkg"
+kind = "vector"
+status = "planned"
+writer = "2.3"
+readers = ["4.3", "5.3", "6.1"]
+standard = "DS-9, DS-18, DS-27"
+
+[[dataset]]
+id = "fetched_sources"
+title = "Sources fetched by this project for chunks that fine_grid does not have"
+path = "{semseg}/{pid}/sources/*/r*_c*.tif"
+kind = "raster"
+status = "planned"
+writer = "4.1"
+readers = ["4.2", "4.3"]
+standard = "DS-3, DS-25"
+
+[[dataset]]
+id = "baselines"
+title = "Baselines B0 (copy of the map) and B1 (rules) as cell records"
+path = "{semseg}/{pid}/baselines/*/r*_c*.parquet"
+kind = "table"
+status = "planned"
+writer = "4.2"
+readers = ["3.1", "5.3"]
+standard = "DS-20"
+
+[[dataset]]
+id = "polygon_classifier"
+title = "Polygon classifier model and its training table"
+path = "{semseg}/models/polygon_classifier/*"
+kind = "model"
+status = "planned"
+writer = "4.3"
+readers = ["4.4"]
+
+[[dataset]]
+id = "eval_sample"
+title = "Evaluation sample (stratified random 30 m cells)"
+path = "{semseg}/{pid}/sample/*.gpkg"
+kind = "vector"
+status = "planned"
+writer = "5.1"
+readers = ["2.4", "5.3"]
+standard = "DS-8, DS-18"
+
+[[dataset]]
+id = "eval_report"
+title = "Accuracy and area estimates with 95 % intervals, gate result"
+path = "{repo}/results/eval/*.csv"
+kind = "table"
+status = "planned"
+writer = "5.3"
+readers = ["3.1"]
+standard = "DS-19"

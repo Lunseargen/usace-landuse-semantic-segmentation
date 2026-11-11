@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.egg-info/
+.coverage
+.factory/
+var/
+*.tif
+*.gpkg
+*.parquet
+*.pt
+*.pth
+results/logs/
