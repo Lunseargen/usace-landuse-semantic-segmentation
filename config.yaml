@@ -1,0 +1,3 @@
+# Project config (D23). Large data goes only under share_root.
+share_root: /run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data/usace-landuse-semseg
+aois: [77, 392]

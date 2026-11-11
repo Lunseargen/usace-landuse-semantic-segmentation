@@ -6,6 +6,11 @@
       "name": "registry",
       "run": "python3 /home/spdc_research/workspace/claude-config/skills/project-plan/scripts/registry_check.py data/REGISTRY.toml --plan PLAN.md",
       "timeout": 120
+    },
+    {
+      "name": "unit",
+      "run": "uv run pytest --cov=semseg --cov-fail-under=100",
+      "timeout": 900
     }
   ],
   "stop_before": [

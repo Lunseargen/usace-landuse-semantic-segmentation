@@ -61,7 +61,7 @@ Limits:
 | R1 | Each output raster and each cell ID lies on the Annual NLCD 30 m grid (EPSG:5070, DS-1 to DS-4) | MOP: 0 cells off the grid | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_grid_lattice` | Unit | open |
 | R2 | The chunk IDs of the code agree with the `fine_grid` chunk lists | MOP: 0 different IDs on 77 and 392 | [1.1](#t-1-1) | `tests/test_grid.py::test_chunks_match_fine_grid` | Integration | open |
 | R3 | Each class code comes from the code table of the data standard (DS-11, DS-12) | MOP: 0 unknown codes | [0.2](#t-0-2), [1.3](#t-1-3) | `tests/test_standard.py::test_code_table` | Unit | open |
-| R4 | No module imports or copies `fine_grid` or `usace_veg` | MOP: 0 imports | [0.1](#t-0-1) | `tests/test_independent.py::test_no_foreign_imports` | Unit | open |
+| R4 | No module imports or copies `fine_grid` or `usace_veg` | MOP: 0 imports | [0.1](#t-0-1) | `tests/test_independent.py::test_no_foreign_imports` | Unit | pass (2026-11-11) |
 | R5 | A missing share stops the step with exit code 3, and no step writes under a read-only root or to the local disk (DS-23 to DS-26) | MOP: 0 local writes | [0.3](#t-0-3) | `tests/test_storage.py::test_share_missing_exit_3` | Unit | open |
 | R6 | The data registry agrees with the files on disk and the plan | MOP: `registry_check.py` exit 0 | [0.3](#t-0-3) | `registry_check.py data/REGISTRY.toml --plan PLAN.md` | Integration | open |
 | R7 | The class shares of a cell sum to 1 ± 0.001 where the cell has a photo | MOP: 0 cells outside the limit | [1.4](#t-1-4) | `tests/test_cells.py::test_shares_sum_to_one` | Unit | open |
@@ -81,7 +81,7 @@ Limits:
 
 ## 2. Stages and tasks (WBS + IPO)
 
-Status (2026-11-11): the plan, the data standard and the registry are written; no code yet. The next task is [0.1 Repository set-up](#t-0-1).
+Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). The next task is [0.2 Data standard in code](#t-0-2).
 
 ```mermaid
 flowchart LR
@@ -133,7 +133,7 @@ flowchart LR
 **Done when:** `pytest` passes, `registry_check.py data/REGISTRY.toml --plan PLAN.md` exits 0, and `results/setup_check.json` shows the share, the GPU, and 384 NAIP chunks.
 
 <a id="t-0-1"></a>
-- [ ] **0.1 Repository set-up** ([D3](DECISIONS.md), [D26](DECISIONS.md))
+- [x] **0.1 Repository set-up** ([D3](DECISIONS.md), [D26](DECISIONS.md))
 
   <details>
   <summary>0.1 IPO card</summary>
@@ -144,18 +144,35 @@ flowchart LR
       subgraph I ["Input"]
           a["<code>fine_grid</code> <code>pyproject.toml</code><br/>(torch cu130, aarch64)"]:::in
           b["samgeo 1.4.2<br/>[samgeo2,text]"]:::in
+          c["edge cases: <code>tests/test_edge_*.py</code><br/>scanner and config inputs"]:::in
       end
       subgraph P ["Process: repository set-up"]
           p1["<code>uv sync --python 3.12</code><br/>→ package <code>src/semseg/</code> → pytest"]:::pr
+          e1["scanner: keyword, built and alias <code>import_module</code> calls"]:::pr
+          e2["scanner: BOM, coding line, directory named <code>x.py</code>"]:::pr
+          e3["scanner: symlinked directories, <code>.pyw</code>, <code>.pyi</code>"]:::pr
+          e4["config: types of <code>share_root</code> and <code>aois</code>"]:::pr
+          e5["config: duplicate keys refused; YAML error as <code>ValueError</code>"]:::pr
       end
       subgraph O ["Output"]
           o1["<code>pyproject.toml</code>, <code>uv.lock</code><br/><code>config.yaml</code>, <code>tests/</code>"]:::ou
           o2["<code>README.md</code>, <code>CLAUDE.md</code><br/>pointers to the plan"]:::ou
+          o3["<code>_independence.py</code>, <code>config.py</code><br/>edge faults fixed"]:::ou
       end
       a --> p1
       b --> p1
       p1 --> o1
       p1 --> o2
+      c --> e1
+      c --> e2
+      c --> e3
+      c --> e4
+      c --> e5
+      e1 --> o3
+      e2 --> o3
+      e3 --> o3
+      e4 --> o3
+      e5 --> o3
       classDef in fill:#dbeafe,stroke:#2563eb,color:#111
       classDef pr fill:#fef3c7,stroke:#d97706,color:#111
       classDef ou fill:#dcfce7,stroke:#16a34a,color:#111
@@ -1278,6 +1295,10 @@ Add a row when a new item appears. Write "closed <date>" in the action column wh
 | Risk | SAM polygons do not match land-cover areas (shadows, tree crowns) (pre-mortem 2) | L3 × I4 = 12 | look at the demo pictures; the classifier in 4.3 uses the polygon features; look again after 1.5 | [1.5](#t-1-5) |
 | Risk | Slow reads from the SMB share | L3 × I2 = 6 | watch the run log time for each chunk | [4.4](#t-4-4) |
 | Risk | The NAIP is from 2022 only, so the composition is valid only for 2022 (pre-mortem 4) | L5 × I1 = 5 | DS-5: each record has `naip_year`; the history comes from the stack | [1.4](#t-1-4) |
+| Risk | `samgeo` does not install or import on the GB10 | FM-15 | `test_import_samgeo`; `uv sync --locked` | [0.1](#t-0-1) |
+| Risk | The independence test misses a foreign import or copy | FM-16 | `test_scanner_catches_planted_imports`; AST scan | [0.1](#t-0-1) |
+| Risk | The scanner misses a foreign import made with a keyword, a built name, or an alias | FM-19 | `test_edge_keyword_argument_import`; `test_edge_built_name_import`; `test_edge_aliased_import_call` | [0.1](#t-0-1) |
+| Risk | A wrong `share_root` or `aois` type reaches a path call or a write | FM-22 | `test_edge_share_root_must_be_nonempty_string`; `test_edge_aois_must_be_list_of_int`; `test_edge_share_root_must_be_absolute` | [0.1](#t-0-1) |
 | Assumption | SAM 2 and LangSAM run inside about 8 GB of GPU memory | — | measure in the first GPU run of 1.2 | [1.2](#t-1-2) |
 | Assumption | The SAM 2 and Grounding DINO weights download from Hugging Face with no token | — | N6 check | [0.3](#t-0-3) |
 | Assumption | The polygon label method (prompts + vote + classifier) is good enough; Jack: "whatever works" (2026-11-11) | — | compare the 3 methods in the demo report and in 5.3 | [1.5](#t-1-5) |
@@ -1422,6 +1443,16 @@ action, a RAID Risk row, a CAUTION, and a test. Run `render_ipo.py ... --pareto`
 | FM-11 | 4.1/p1 | the fetch writes or deletes a file under `fine_grid_test` | the `fine_grid` data changes | no read-only check | none | 8 | 2 | 3 | 48 | Prevent: read-only roots in `storage.py`; Detect: `test_skips_existing_and_readonly`; R16 |
 | FM-12 | 1.4/p3 | the history uses the wrong layer or year | a wrong past in the cell record | file name pattern | none | 5 | 3 | 4 | 60 | Detect: `test_record_schema` checks 41 years and the layer names |
 | FM-13 | 3.2/p2 | a chart colour or legend does not match the code | Jack misreads the composition | colours out of the code table | none | 5 | 3 | 5 | 75 | Prevent: colours only from `standard.py` (DS-13) |
+| FM-14 | 0.1/a | the copied torch pin gives a CPU wheel or a cu12x wheel on aarch64 | `torch.cuda.is_available()` is false; GPU stages fail late | the `fine_grid` pin targets another index or version; no evidence of a check | `test_torch_cuda_build` | 6 | 4 | 3 | 72 | Detect: `tests/test_env.py::test_torch_cuda_build` checks `torch.version.cuda` starts with 13 (no `is_available()` call: D22) |
+| FM-15 | 0.1/b | `samgeo==1.4.2[samgeo2,text]` does not resolve or `import samgeo` fails on aarch64 | stage 1 cannot start; the lock is not usable | no aarch64 wheel (GDAL, groundingdino build); no evidence of a check | `test_import_samgeo` | 7 | 5 | 3 | 105 | Prevent: pin the version and the Python (3.12) in `pyproject.toml`; Detect: `test_import_samgeo` imports `samgeo` and `samgeo.text_sam` and `uv sync --locked` exits 0 |
+| FM-16 | 0.1/p1 | `test_no_foreign_imports` passes but a `fine_grid` or `usace_veg` import or copy exists | R4 and D3 break unseen; the code is not independent | the test scans only `import x` lines; it misses `from x import`, `importlib`, relative copies, and pasted code | `test_no_foreign_imports`; `test_scanner_catches_planted_imports`; `test_edge_toml_other_sections` | 8 | 4 | 7 | 224 | Prevent: parse with `ast` over `src/` and `tests/`; Detect: `test_no_foreign_imports` plus `test_scanner_catches_planted_imports` (fixtures: `import`, `from`, `importlib.import_module`, `__import__`, a nested import) and a check for the names in text of `pyproject.toml` (edge hunt: `_toml_foreign_names` misses `optional-dependencies`, `tool.uv.dev-dependencies`, workspace members and a path or git value under an innocent key; D raised 5 to 7; test `test_edge_toml_other_sections`) |
+| FM-17 | 0.1/o1 | `uv.lock` is missing or stale, or pytest cannot find `semseg` | a new session gets other versions; `pytest` fails | `src/` layout without the package in the build config; lock not committed | `test_package_importable` | 5 | 3 | 4 | 60 | Detect: `test_package_importable` imports `semseg`; `uv lock --check` exits 0 |
+| FM-18 | 0.1/o2 | `README.md` or `CLAUDE.md` points to a wrong or missing plan section | a new session starts from a wrong rule | a path or an anchor changed | none | 3 | 3 | 5 | 45 | open: `test_doc_links` not written yet |
+| FM-19 | 0.1/e1 | the scanner misses a foreign import made with a keyword argument, a built name, or an alias of `import_module` | R4 and D3 break unseen | the scan reads only a constant `args[0]` of a call named `import_module` or `__import__` | `test_edge_keyword_argument_import`; `test_edge_built_name_import`; `test_edge_aliased_import_call` | 8 | 3 | 6 | 144 | Prevent: read `keywords` (`name=`, `package=`), fold constants, flag f-string and concatenation prefixes, follow `from importlib import import_module as x`; Detect: `test_edge_keyword_argument_import`, `test_edge_built_name_import`, `test_edge_aliased_import_call` |
+| FM-20 | 0.1/e2 | the scanner crashes on valid input: UTF-8 BOM, PEP 263 coding line, a directory named `x.py` | the gate fails with a false alarm | `read_text(encoding="utf-8")` and no `is_file()` check | `test_edge_valid_python_encodings`; `test_edge_directory_named_like_python_file` | 4 | 3 | 3 | 36 | Prevent: `ast.parse(path.read_bytes())`; skip non-files; Detect: `test_edge_valid_python_encodings`, `test_edge_directory_named_like_python_file` |
+| FM-21 | 0.1/e3 | the scanner does not follow a symlinked directory and skips `.pyw` and `.pyi` | a foreign import hides behind a link | `rglob("*.py")` does not follow directory links in Python 3.12 | `test_edge_symlinked_directory_is_scanned`; `test_edge_other_python_suffixes` | 6 | 2 | 6 | 72 | Prevent: walk with `os.walk(followlinks=True)` with a visited set; add the suffixes; Detect: `test_edge_symlinked_directory_is_scanned`, `test_edge_other_python_suffixes` |
+| FM-22 | 0.1/e4 | `load_config` returns a wrong type: `share_root` null, int, bool, list, empty or relative; `aois` null, scalar, str, or a list with str, bool, float, NaN | a later path call fails far from the cause, or a write lands in the current directory (D23) | only the key names are checked | `test_edge_share_root_must_be_nonempty_string`; `test_edge_aois_must_be_list_of_int`; `test_edge_share_root_must_be_absolute` | 7 | 3 | 5 | 105 | Prevent: validate `share_root` as a non-empty absolute `str` and `aois` as a list of `int` (not `bool`); Detect: `test_edge_share_root_must_be_nonempty_string`, `test_edge_aois_must_be_list_of_int`, `test_edge_share_root_must_be_absolute` |
+| FM-23 | 0.1/e5 | `load_config` accepts a duplicate key (last wins) and raises `yaml.YAMLError`, not `ValueError` | a silent wrong value; a caller that catches `ValueError` misses the error | `yaml.safe_load` default behaviour | `test_edge_duplicate_key_refused`; `test_edge_malformed_yaml_is_value_error` | 4 | 2 | 5 | 40 | Prevent: a loader that refuses duplicate keys; wrap `YAMLError` in `ValueError`; Detect: `test_edge_duplicate_key_refused`, `test_edge_malformed_yaml_is_value_error` |
 
 FTA for the worst result (FM-3 and FM-4 have S ≥ 9):
 

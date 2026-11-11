@@ -4,6 +4,12 @@ Semantic segmentation of NAIP 0.5 m imagery, summarised on the Annual NLCD 30 m 
 USACE land-use research. Read [`PLAN.md`](PLAN.md) first: its status line names the next task.
 Decisions are in [`DECISIONS.md`](DECISIONS.md).
 
+## Commands (2026-11-11)
+
+- Set up the environment: `uv sync --python 3.12`.
+- Run the tests with the coverage gate: `uv run pytest --cov=semseg --cov-fail-under=100`.
+- Run the task gate: `python3 ~/.claude/skills/build-task/scripts/gate.py`.
+
 ## Rules (2026-11-11)
 
 - Obey [`docs/DATA_STANDARD.md`](docs/DATA_STANDARD.md). To change a rule: the standard (and its
