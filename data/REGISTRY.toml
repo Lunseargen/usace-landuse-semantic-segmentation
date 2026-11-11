@@ -187,6 +187,16 @@ readers = ["1.2", "1.3"]
 standard = "DS-28"
 
 [[dataset]]
+id = "runs"
+title = "Run folders: one folder for each run, named by run_id (DS-22)"
+path = "{semseg}/runs/*/*"
+kind = "other"
+status = "planned"
+writer = "0.3"
+readers = ["1.2", "4.1"]
+standard = "DS-22"
+
+[[dataset]]
 id = "polygons"
 title = "SAM 2 polygons with labels for each chunk"
 path = "{semseg}/{pid}/polygons/r*_c*.gpkg"

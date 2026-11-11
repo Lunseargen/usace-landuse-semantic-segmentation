@@ -1,0 +1,65 @@
+{
+  "created": "2026-11-11T18:15:49Z",
+  "expected_naip": {
+    "392": 227,
+    "77": 157
+  },
+  "gpu": {
+    "apps": [
+      {
+        "pid": 1949852,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mb": 79905
+      }
+    ],
+    "found": true,
+    "gpus": [
+      {
+        "memory_free_mb": null,
+        "memory_total_mb": null,
+        "memory_used_mb": null,
+        "name": "NVIDIA GB10",
+        "utilization_pct": 96
+      }
+    ]
+  },
+  "hf_home": "/run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data/usace-landuse-semseg/models",
+  "layers": {
+    "392": {
+      "boundary": true,
+      "classf": 41,
+      "nlcd": 41,
+      "ok": true,
+      "tcc": 41,
+      "vectors": true
+    },
+    "77": {
+      "boundary": true,
+      "classf": 41,
+      "nlcd": 41,
+      "ok": true,
+      "tcc": 41,
+      "vectors": true
+    }
+  },
+  "memory": {
+    "available_mb": 26479,
+    "total_mb": 124546,
+    "used_mb": 98067
+  },
+  "naip": {
+    "392": 227,
+    "77": 157
+  },
+  "naip_total": 384,
+  "pass": true,
+  "reason": null,
+  "roots": {
+    "fgt": "/run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data/usace-landuse/fine_grid_test",
+    "semseg": "/run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data/usace-landuse-semseg",
+    "share": "/run/user/1001/gvfs/smb-share:server=100.102.218.98,share=lab/data",
+    "stack": "/home/spdc_research/workspace/usace-landuse/USACE/01_Data/stack"
+  },
+  "run_id": "20261111-1815-setup_check",
+  "share_ok": true
+}

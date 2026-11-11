@@ -72,7 +72,7 @@ Dated notes (2026-11-11):
 
 - Grid math is exact (`int` or `Fraction`). Bounds off the 30 m lattice raise `ValueError`.
 - Share sums round to 9 decimals before each limit (D34).
-- D27 to D34 are `Draft (factory):` decisions. Jack reviews them.
+- D27 to D40 are `Draft (factory):` decisions. Jack reviews them.
 
 ## Where the data is
 
@@ -84,3 +84,21 @@ Large data is on the lab share, not in this repository:
 
 The share is a GVFS mount. It exists only while the user is logged in on the desktop. If it
 is missing, the steps stop (exit code 3). They never write the data to the local disk.
+
+## Storage and set-up check
+
+Storage (`semseg.storage`, 2026-11-11):
+
+- The roots come from `data/REGISTRY.toml` `[roots]`. The `share_root` value in `config.yaml` must equal the `semseg` root (D36).
+- The share guard exits with code 3 when the share is missing. It never creates the share path.
+- The `fgt` and `stack` roots are read only. A write under them raises an error.
+- A write goes to a unique part file in the target folder, `<name>.<8 hex>.part`. Then `os.replace` moves it to `<name>` (D39).
+- `ensure_hf_home()` sets `HF_HOME` to `<semseg>/models` when it is not set (D38). If `HF_HOME` is set outside the semseg root, it raises `ValueError`. Call it before any Hugging Face import.
+
+Set-up check (`semseg.setup_check`, 2026-11-11):
+
+- Run it from the repository root: `uv run python -m semseg.setup_check`
+- It reads the share, the stack and the GPU state. It writes nothing to the share or the stack, and it starts no GPU run.
+- Each run writes `results/setup_check.json`. A failed check sets `pass` to `false` and gives the `reason` (D40).
+- Exit codes: 0 = pass, 1 = other failure, 3 = share missing.
+- Last result (2026-11-11): `pass` true. NAIP 2022 chunks: 157 for 77 and 227 for 392, total 384 (D35).

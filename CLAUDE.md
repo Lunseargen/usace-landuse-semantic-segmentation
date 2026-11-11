@@ -9,6 +9,7 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
 - Set up the environment: `uv sync --python 3.12`.
 - Run the tests with the coverage gate: `uv run pytest --cov=semseg --cov-fail-under=100`.
 - Run the task gate: `python3 ~/.claude/skills/build-task/scripts/gate.py`.
+- Run the set-up check (read only, no GPU run): `uv run python -m semseg.setup_check`. Exit code 3 = the lab share is not mounted.
 
 ## Rules (2026-11-11)
 
@@ -21,6 +22,7 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
   `usace_veg`). Their data is read only (D3).
 - Large data goes only to `<share>/data/usace-landuse-semseg/` (D23). Never write under
   `fine_grid_test` or the stack.
+- Write data only through `semseg.storage` (share guard, read-only roots, safe write).
 - Do not start a GPU run (SAM 2, LangSAM, training) until the user says so (D22). The vLLM
   server holds about 97 GB of the 121 GB GB10 memory.
 - The web app uses the `vllmPortal` design (`~/workspace/vllmPortal/DESIGN.md`) and the login
