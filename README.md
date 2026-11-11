@@ -55,7 +55,7 @@ Dated notes (2026-11-11):
 
 ## Data standard in code
 
-`semseg.standard` holds the data standard (`docs/DATA_STANDARD.md`, version 2). It has one pure
+`semseg.standard` holds the data standard (`docs/DATA_STANDARD.md`, version 3). It has one pure
 function or constant for each DS rule. It does no file access and no storage (task 0.3).
 
 Main names:
@@ -72,7 +72,30 @@ Dated notes (2026-11-11):
 
 - Grid math is exact (`int` or `Fraction`). Bounds off the 30 m lattice raise `ValueError`.
 - Share sums round to 9 decimals before each limit (D34).
-- D27 to D40 are `Draft (factory):` decisions. Jack reviews them.
+- D27 to D45 are `Draft (factory):` decisions. Jack reviews them.
+
+## Chunk grid
+
+`semseg.grid` builds the chunk list of each pilot (task 1.1). It writes
+`<semseg>/<pid>_<NAME>/chunks.parquet` through `semseg.storage.safe_write`. The schema is in
+`docs/DATA_STANDARD.md` DS-22 and `PLAN.md` ICD I9.
+
+Command:
+
+```
+uv run python -m semseg.grid 77 392
+```
+
+Dated notes (2026-11-11):
+
+- Rule (D43, D44): a chunk is in the list when its 960 m box shares an area > 0 with the footprint
+  (`boundary.gpkg`) buffered by 150 m. A chunk that only touches the buffer edge is not in the list.
+- Result: 157 chunks for 77 and 227 for 392. Both ID sets equal `chunks.csv` of `fine_grid_test`.
+  The CLI does not read `chunks.csv`. `test_chunks_match_fine_grid` does (read only).
+- All pids are checked before the first write. A bad pid or a bad frame writes nothing.
+- DS-21 `code_version` (D45): the full commit SHA, with `-dirty` when tracked files have changes.
+  Without git or a commit, the command raises an error and writes nothing.
+- The files of 2026-11-11 have `-dirty` (uncommitted work). Run the command again after the commit.
 
 ## Where the data is
 

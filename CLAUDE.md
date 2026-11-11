@@ -9,6 +9,7 @@ Decisions are in [`DECISIONS.md`](DECISIONS.md).
 - Set up the environment: `uv sync --python 3.12`.
 - Run the tests with the coverage gate: `uv run pytest --cov=semseg --cov-fail-under=100`.
 - Run the task gate: `python3 ~/.claude/skills/build-task/scripts/gate.py`.
+- Write the chunk list of each pilot (task 1.1): `uv run python -m semseg.grid <pid> ...`.
 - Run the set-up check (read only, no GPU run): `uv run python -m semseg.setup_check`. Exit code 3 = the lab share is not mounted.
 
 ## Rules (2026-11-11)

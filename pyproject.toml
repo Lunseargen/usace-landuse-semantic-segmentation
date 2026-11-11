@@ -10,6 +10,10 @@ dependencies = [
     "torchvision",
     "pyyaml",
     "rasterio",
+    "pandas",
+    "geopandas",
+    "shapely",
+    "pyarrow",
 ]
 
 [dependency-groups]

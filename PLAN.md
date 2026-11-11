@@ -59,7 +59,7 @@ Limits:
 | ID | Requirement | Measure | Work items | Verification | Level | Status |
 |---|---|---|---|---|---|---|
 | R1 | Each output raster and each cell ID lies on the Annual NLCD 30 m grid (EPSG:5070, DS-1 to DS-4) | MOP: 0 cells off the grid | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_grid_lattice` | Unit | pass (2026-11-11) |
-| R2 | The chunk IDs of the code agree with the `fine_grid` chunk lists | MOP: 0 different IDs on 77 and 392 | [1.1](#t-1-1) | `tests/test_grid.py::test_chunks_match_fine_grid` | Integration | open |
+| R2 | The chunk IDs of the code agree with the `fine_grid` chunk lists | MOP: 0 different IDs on 77 and 392 | [1.1](#t-1-1) | `tests/test_grid.py::test_chunks_match_fine_grid` | Integration | pass (2026-11-11) |
 | R3 | Each class code comes from the code table of the data standard (DS-11, DS-12) | MOP: 0 unknown codes | [0.2](#t-0-2), [1.3](#t-1-3) | `tests/test_standard.py::test_code_table` | Unit | pass (2026-11-11) |
 | R4 | No module imports or copies `fine_grid` or `usace_veg` | MOP: 0 imports | [0.1](#t-0-1) | `tests/test_independent.py::test_no_foreign_imports` | Unit | pass (2026-11-11) |
 | R5 | A missing share stops the step with exit code 3, and no step writes under a read-only root or to the local disk (DS-23 to DS-26) | MOP: 0 local writes | [0.3](#t-0-3) | `tests/test_storage.py::test_share_missing_exit_3` | Unit | pass (2026-11-11) |
@@ -81,7 +81,7 @@ Limits:
 
 ## 2. Stages and tasks (WBS + IPO)
 
-Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). 0.2 Data standard in code is done (`semseg.standard`, data standard version 2, draft decisions D27 to D34 for Jack's review; 543 tests, 100 % coverage). 0.3 Storage, registry and set-up check is done (`semseg.storage`, `semseg.setup_check`; `results/setup_check.json` passes with 157 + 227 = 384 NAIP chunks; draft decisions D35 to D40 for Jack's review; 734 tests, 100 % coverage). Stage 0 is done, and its TRR is due. The draft decisions D27 to D40 wait for Jack's review. The next task is [1.1 Chunk grid](#t-1-1).
+Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). 0.2 Data standard in code is done (`semseg.standard`, data standard version 2, draft decisions D27 to D34 for Jack's review; 543 tests, 100 % coverage). 0.3 Storage, registry and set-up check is done (`semseg.storage`, `semseg.setup_check`; `results/setup_check.json` passes with 157 + 227 = 384 NAIP chunks; draft decisions D35 to D40 for Jack's review; 734 tests, 100 % coverage). Stage 0 is done, and its TRR is due. 1.1 Chunk grid is done (`semseg.grid`; `chunks.parquet` for 77 (157 chunks) and 392 (227 chunks) on the share; data standard version 3; 896 tests, 100 % coverage). The draft decisions D27 to D45 wait for Jack's review. The next task is [1.2 SAM 2 polygons](#t-1-2). Tasks [1.2](#t-1-2) and [1.3](#t-1-3) can only be built with a fake model until Jack says "run" (D22, D42).
 
 ```mermaid
 flowchart LR
@@ -328,7 +328,7 @@ flowchart LR
 > **CAUTION:** Tasks 1.2 and 1.3 use the GPU. Do not start a GPU run until Jack says so (D22). The vLLM server holds about 97 GB.
 
 <a id="t-1-1"></a>
-- [ ] **1.1 Chunk grid** ([D1](DECISIONS.md), [D13](DECISIONS.md))
+- [x] **1.1 Chunk grid** ([D1](DECISIONS.md), [D13](DECISIONS.md), [D43](DECISIONS.md), [D44](DECISIONS.md), [D45](DECISIONS.md))
 
   <details>
   <summary>1.1 IPO card</summary>
@@ -339,6 +339,7 @@ flowchart LR
       subgraph I ["Input"]
           a["<code>boundary.gpkg</code><br/>(footprint, EPSG:5070)"]:::in
           b["<code>fine_grid</code> <code>chunks.csv</code><br/>(check only)"]:::in
+          e["edge cases: <code>tests/test_edge_grid.py</code><br/>(bad footprint, pid, time, Git)"]:::in
       end
       subgraph P ["Process: <code>semseg.grid</code>"]
           p1["buffer 150 m → chunks that touch it<br/>→ IDs <code>r&lt;row&gt;_c&lt;col&gt;</code>"]:::pr
@@ -350,6 +351,7 @@ flowchart LR
       end
       a --> p1
       b --> p2
+      e --> p1
       p1 --> o1
       p2 --> o2
       classDef in fill:#dbeafe,stroke:#2563eb,color:#111
@@ -1333,6 +1335,13 @@ Add a row when a new item appears. Write "closed <date>" in the action column wh
 | Risk | A grid function rounds an off-lattice point | FM-28 | `test_off_lattice_raises`; `test_edge_on_lattice_one_ulp_off_x` | [0.2](#t-0-2) |
 | Risk | `test_grid_lattice` is skipped and the suite is green | FM-29 | `test_grid_lattice_not_skipped`; no skip, exit 3 | [0.2](#t-0-2) |
 | Risk | A cell ID or row above int64 gives a wrong join | FM-30 | `test_edge_cell_id_int64_limit`; `test_edge_cell_rowcol_int64_limit` | [0.2](#t-0-2) |
+| Risk | The boundary file has a wrong CRS, two features, or an invalid geometry, so the chunk list is wrong | FM-54 | `test_edge_boundary_wrong_crs_refused`; `test_edge_boundary_two_features_refused`; `test_edge_boundary_invalid_geometry_refused` | [1.1](#t-1-1) |
+| Risk | A chunk that touches the buffer edge is in or out by the wrong rule | FM-55 | `test_edge_chunk_touching_buffer_edge`; `test_edge_chunk_with_tiny_overlap_is_in` | [1.1](#t-1-1) |
+| Risk | The row or column index shifts by one | FM-56 | `test_chunk_functions`; `test_chunks_match_fine_grid` | [1.1](#t-1-1) |
+| Risk | `chunks.parquet` has no fixed schema, so the readers break | FM-58 | `test_chunks_parquet_schema_roundtrip`; `test_chunk_list_dtypes_and_order` | [1.1](#t-1-1) |
+| Risk | The comparison test is too weak to catch a wrong list | FM-59 | `test_chunks_match_fine_grid`; `test_edge_compare_detects_extra_chunk` | [1.1](#t-1-1) |
+| Risk | `write_chunk_list` writes a list that breaks DS-22 or DS-6 (dtype, NaN, duplicate, pid or folder mismatch) | FM-61 | `test_edge_write_refuses_int32_row`; `test_edge_write_refuses_nan_share`; `test_edge_write_refuses_duplicate_chunk`; `test_edge_write_refuses_pid_that_differs_from_folder` | [1.1](#t-1-1) |
+| Risk | The `chunk` column is `large_string`, not `string` | FM-62 | `test_edge_parquet_chunk_column_is_string_not_large_string` | [1.1](#t-1-1) |
 | Assumption | SAM 2 and LangSAM run inside about 8 GB of GPU memory | — | measure in the first GPU run of 1.2 | [1.2](#t-1-2) |
 | Assumption | The SAM 2 and Grounding DINO weights download from Hugging Face with no token | — | N6 check | [0.3](#t-0-3) |
 | Assumption | The polygon label method (prompts + vote + classifier) is good enough; Jack: "whatever works" (2026-11-11) | — | compare the 3 methods in the demo report and in 5.3 | [1.5](#t-1-5) |
@@ -1362,7 +1371,7 @@ n0              = 1.96² × 0.5 × 0.5 / 0.05² = 384.16
 | Agreement with NLCD 2022 on the demo chunks | MOP | not measured | [1.5](#t-1-5) |
 | Share of polygons with a prompt code | TPM | not measured (target ≥ 90 % by 2026-11-25) | [1.3](#t-1-3) |
 | Level-1 accuracy of the classifier (cross-validated) | TPM | not measured (target ≥ 85 % by 2026-12-15) | [4.3](#t-4-3) |
-| Open RTM rows | TPM | 14 of 20 open (2026-11-11) | section 1 |
+| Open RTM rows | TPM | 13 of 20 open (2026-11-11) | section 1 |
 
 Arithmetic: 20 × 16 = 320, + 80 = 400; 40 × 16 = 640, + 200 = 840. Cells: 15,673 ac / 0.2224 ac
 (one 30 m cell) = 70,474; 30,608 ac / 0.2224 ac = 137,629. n for 77: 384.16 / (1 + 383.16 /
@@ -1452,6 +1461,19 @@ Rule: the same lattice as DS-2; read only (DS-23).
 | `estimate`, `ci_low`, `ci_high` | float | share or acres | 95 % interval |
 | `n` | int | cells | sample cells |
 
+<a id="i9"></a>
+**I9 chunk list** · format: Parquet, `<pid>_<NAME>/chunks.parquet` · registry: `chunk_list` · owner: [1.1](#t-1-1) (readers 1.2, 4.1, 4.4) · test: `test_chunks_parquet_schema_roundtrip`
+
+| Field | Type | Unit | Rule |
+|---|---|---|---|
+| `chunk` | text | — | DS-7, unique |
+| `row`, `col` | int64 | — | DS-3 |
+| `xmin`, `ymin`, `xmax`, `ymax` | float64 | m | the chunk box, EPSG:5070 (DS-1), 960 m (DS-3) |
+| `footprint_share` | float64 | — | area of the chunk inside the unbuffered footprint / 960², rounded to 4 decimals (0–1) |
+| `pid` | int64 | — | DS-6 |
+
+Rows: the chunks whose box has a positive area inside the footprint buffered by 150 m (D13, D43, D44), sorted by `row`, then `col`. Metadata: DS-21. Data standard: DS-3, DS-22.
+
 </details>
 
 ## 6. FMEA
@@ -1517,6 +1539,22 @@ action, a RAID Risk row, a CAUTION, and a test. Run `render_ipo.py ... --pareto`
 | FM-51 | 0.3/o2 | `--out` of `setup_check` is under `fgt`, `stack` or the share but not semseg | the JSON file and new folders are written into a read-only root (D23, DS-23) | `write_report` had no read-only check and used `mkdir(parents=True)` | `test_edge_out_under_readonly_root_refused`; `test_write_report_refuses_readonly_root`; `test_out_under_share_or_semseg_refused_nothing_created`; `test_write_report_missing_parent_not_created` | 7 | 3 | 4 | 84 | Prevent: refuse an `--out` under a read-only root, the share root or the semseg root; Detect: the four tests; R5 |
 | FM-52 | 0.3/o2 | a failed run leaves the old `results/setup_check.json` with `pass: true` | the S0 gate reads an old pass; the report has no time stamp | the file was written only on success; no time stamp or run id | `test_edge_failed_run_does_not_leave_stale_pass`; `test_edge_bad_hf_home_writes_failure_report_and_replaces_stale_pass`; `test_main_load_roots_value_error_writes_failure_report` | 6 | 4 | 4 | 96 | Prevent: a failed run writes `pass: false` with `created` and `run_id` (D40); Detect: the three tests |
 | FM-53 | 0.3/a | `~user` of an unknown user in a registry root | `RuntimeError` from pathlib instead of `ValueError` | `Path.expanduser` was not wrapped | `test_edge_load_roots_unknown_user_tilde` | 3 | 2 | 2 | 12 | Prevent: catch `RuntimeError` and raise `ValueError`; Detect: `test_edge_load_roots_unknown_user_tilde` |
+| FM-54 | 1.1/a | `boundary.gpkg` has a CRS other than EPSG:5070, or more than one feature, or an invalid geometry | The 150 m buffer has the wrong unit or shape; the chunk list is wrong for the whole pilot | The code reads the file without a check | `test_edge_boundary_wrong_crs_refused`; `test_edge_boundary_two_features_refused`; `test_edge_boundary_no_feature_refused`; `test_edge_boundary_invalid_geometry_refused`; `test_edge_boundary_not_a_polygon_refused` | 7 | 3 | 2 | 42 | Prevent: check CRS == EPSG:5070, 1 feature, `is_valid`; Detect: `test_edge_boundary_wrong_crs_refused` |
+| FM-55 | 1.1/p1 | A chunk that only touches the buffer edge is in or out by the wrong rule (`intersects` vs `touches`; buffer join style) | The list has an extra or a missing chunk; the data match hides it (no real case isolates it) | The real data has no edge-touch case | `test_edge_chunk_touching_buffer_edge`; `test_edge_chunk_with_tiny_overlap_is_in` | 6 | 4 | 5 | 120 | Prevent: one rule, area > 0 (D44) on the closed box, with default buffer; Detect: `test_edge_chunk_touching_buffer_edge` (synthetic footprint) |
+| FM-56 | 1.1/p1 | Row or column off by one (round instead of floor, y axis sign) | All IDs shift; 1.2 and later tasks read the wrong NAIP area | A new index formula instead of `chunk_of_bounds` / `chunk_bounds` | `test_chunk_functions`; `test_chunks_match_fine_grid` | 8 | 2 | 2 | 32 | Prevent: use only `semseg.standard` functions; Detect: `test_chunks_match_fine_grid` (box of each row equals `chunk_bounds`) |
+| FM-57 | 1.1/b | The `chunks.csv` read fails or the share is missing and the test skips | R2 shows green with no check | A `skip` or a `try/except` around the read | `test_edge_chunks_csv_missing_exit_3`; `test_edge_share_missing_exit_3_for_chunks_csv` | 6 | 3 | 3 | 54 | Prevent: `guard_share` exit 3, no `skip` (FM-29); Detect: `test_edge_chunks_csv_missing_exit_3` |
+| FM-58 | 1.1/o1 | `chunks.parquet` has no fixed schema (columns, dtypes, order, `footprint_share` rounding) | 1.2, 4.1 and 4.4 read a wrong type or column; a late break | DS-20 and the ICD name no schema for this file | `test_chunks_parquet_schema_roundtrip`; `test_chunk_list_dtypes_and_order` | 6 | 5 | 6 | 180 | Prevent: add the schema to the ICD (`chunk,row,col,xmin,ymin,xmax,ymax,footprint_share`; int32, float64) before code; Detect: `test_chunks_parquet_schema_roundtrip` |
+| FM-59 | 1.1/o2 | The comparison checks only set equality, or both lists are empty | R2 passes with a wrong count, a duplicate, or a wrong order | A weak assert | `test_chunks_match_fine_grid`; `test_edge_compare_detects_extra_chunk`; `test_edge_compare_detects_missing_chunk` | 7 | 3 | 4 | 84 | Prevent: assert the counts 157 and 227, unique IDs, sorted order, and `footprint_share` within 1e-4; Detect: `test_chunks_match_fine_grid`, `test_edge_compare_detects_extra_chunk` |
+| FM-60 | 1.1/e | `chunk_list` with a pid above int64 max (2**63) writes a negative pid | The `pid` column wraps with no error; 1.2 and later join on a wrong pid | `_check_pid` has no upper limit; `astype(int64)` wraps | `test_edge_pid_int64_max_is_kept`; `test_edge_pid_above_int64_refused` | 6 | 2 | 4 | 48 | Prevent: refuse a pid above 2**63-1 in `_check_pid`; Detect: `test_edge_pid_above_int64_refused` |
+| FM-61 | 1.1/e | `write_chunk_list` checks only the column names: it writes int32, NaN share, 0 rows, duplicate or unsorted chunks, a pid that differs from the folder, a folder that is not `<pid>_<NAME>` | A chunks.parquet that breaks DS-22 or DS-6 reaches the share; 1.2, 4.1 and 4.4 read a wrong list | The guard is `list(df.columns) != COLUMNS` only | `test_edge_write_chunk_list_wrong_columns_refused`; `test_edge_write_refuses_int32_row`; `test_edge_write_refuses_nan_share`; `test_edge_write_refuses_empty_list`; `test_edge_write_refuses_duplicate_chunk`; `test_edge_write_refuses_unsorted_rows`; `test_edge_write_refuses_pid_that_differs_from_folder`; `test_edge_write_refuses_folder_that_is_not_ds6`; `test_edge_write_refuses_hostile_folder_and_writes_nothing` | 7 | 3 | 5 | 105 | Prevent: check dtype, NaN, non-empty, unique sorted `chunk`, `pid` against the folder, and `parse_project_folder(folder)` before the write; Detect: `test_edge_write_refuses_*`; extends FM-58 |
+| FM-62 | 1.1/e | Parquet `chunk` column is `large_string` (pandas 3 `str` dtype), DS-22 says string | A reader that concatenates this file with a `string` file gets a schema mismatch; a strict reader refuses the type | `pa.Table.from_pandas` of a pandas 3 `str` column; the schema test checks the pandas dtype only | `test_chunks_parquet_schema_roundtrip`; `test_edge_parquet_chunk_column_is_string_not_large_string` | 5 | 4 | 5 | 100 | Prevent: cast `chunk` to `pa.string()` in `write_chunk_list`; Detect: `test_edge_parquet_chunk_column_is_string_not_large_string`; extends FM-58 |
+| FM-63 | 1.1/e | `compare_chunks` treats a NaN `footprint_share` as equal (`abs(NaN) > tol` is False) | R2 passes although the share of a chunk is missing in one list | The share test uses one `>` with no NaN case | `test_edge_compare_nan_share_is_moved`; `test_edge_compare_nan_bound_is_moved`; `test_edge_compare_share_tolerance_boundary` | 6 | 3 | 5 | 90 | Prevent: `moved OR (isna(a) XOR isna(b))` or `~(diff <= tol)`; Detect: `test_edge_compare_nan_share_is_moved`; extends FM-59 |
+| FM-64 | 1.1/e | `_code_version` returns `HEAD` in a repository with no commit (return code not checked); a dirty tree gives the plain HEAD commit | DS-21 `code_version` is not a commit, or names a commit that does not hold the code that ran | `subprocess.run` with no `check` and no return code test; no `git status` test | `test_code_version_raises_without_git`; `test_code_version_raises_for_a_failed_command`; `test_code_version_is_full_sha_with_optional_dirty`; `test_edge_code_version_in_repo_without_commit_raises`; `test_edge_code_version_outside_a_repository_raises` | 4 | 3 | 5 | 60 | Prevent: raise and write nothing (D45) when `returncode != 0`; mark a dirty tree (design decision for the user); Detect: `test_edge_code_version_in_repo_without_commit_raises`, `test_edge_code_version_marks_a_dirty_tree` |
+| FM-65 | 1.1/e | The candidate range is the bounding box of the buffer: a footprint with two parts far apart (or a very large footprint) builds O(bbox) records | Memory and time grow with the bounding box, not with the chunk count; a Python list of millions of tuples, or a hang | `range` over rows and columns from `buffered.bounds`; no count limit | `test_edge_sparse_far_apart_parts_do_not_scan_the_bounding_box`; `test_edge_too_many_candidates_refused` | 5 | 3 | 6 | 90 | Prevent: loop over the chunks of each part, or refuse a candidate count above a limit with a ValueError; Detect: `test_edge_sparse_far_apart_parts_do_not_scan_the_bounding_box` |
+| FM-66 | 1.1/e | `main` writes the good pids, then fails on the first bad pid (missing folder, wrong CRS) | A partial result: some pilots have a new `chunks.parquet`, some have an old one or none | The loop reads, computes and writes one pid at a time | `test_edge_main_wrong_crs_writes_nothing`; `test_edge_main_bad_first_pid_writes_nothing`; `test_edge_main_one_bad_pid_among_good_writes_nothing` | 3 | 4 | 4 | 48 | Prevent: build all frames first, then write; Detect: `test_edge_main_one_bad_pid_among_good_writes_nothing` |
+| FM-67 | 1.1/e | `find_folder` accepts a str pid with glob characters (`*`) and returns a folder name that is not DS-6 (`5_lower case`, `9_<CJK>`) | A wrong folder is chosen, or a folder that breaks DS-6 gets a `chunks.parquet` | The pid is not checked and the name is not parsed with `parse_project_folder` | `test_find_folder`; `test_edge_find_folder_glob_characters_in_pid_refused`; `test_edge_find_folder_refuses_non_ds6_name` | 4 | 2 | 4 | 32 | Prevent: `_check_pid(pid)` and `parse_project_folder(name)` in `find_folder`; Detect: `test_edge_find_folder_glob_characters_in_pid_refused`, `test_edge_find_folder_refuses_non_ds6_name` |
+| FM-68 | 1.1/e | `_metadata` with a timezone-aware time that is not UTC labels the local time with `Z` | `created` and `run_id` are wrong by the offset (only when a caller passes `now`; `main` uses UTC) | `strftime` without `astimezone(timezone.utc)` | `test_edge_metadata_converts_non_utc_time_to_utc`; `test_edge_metadata_naive_time_refused` | 2 | 2 | 4 | 16 | Prevent: `now = now.astimezone(timezone.utc)` when `now.tzinfo` is set; Detect: `test_edge_metadata_converts_non_utc_time_to_utc` |
+| FM-69 | 1.1/e | `read_fg_chunks('..', roots)` reads `<fgt>/../chunks.csv`: the folder name is not checked | A read outside the `fgt` root (read only; a test helper, so low impact) | No `check_name(folder)` | `test_edge_read_fg_chunks_refuses_dot_dot`; `test_edge_read_fg_chunks_refuses_absolute_and_symlink_escape` | 2 | 2 | 4 | 16 | Prevent: `standard.check_name(folder)` in `read_fg_chunks`; Detect: `test_edge_read_fg_chunks_refuses_dot_dot` |
 
 FTA for the worst result (FM-3 and FM-4 have S ≥ 9):
 

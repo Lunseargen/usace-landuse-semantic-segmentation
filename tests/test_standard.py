@@ -257,7 +257,7 @@ def test_data_standard_version():
     """DS-16: the version constant equals the `Version <n>` line of docs/DATA_STANDARD.md (D31)."""
     m = re.search(r"^Version (\d+)", _doc_text(), re.MULTILINE)
     assert m, "no 'Version <n>' line in docs/DATA_STANDARD.md"
-    assert S.DATA_STANDARD_VERSION == 2
+    assert S.DATA_STANDARD_VERSION == 3
     assert int(m.group(1)) == S.DATA_STANDARD_VERSION
 
 

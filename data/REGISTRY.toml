@@ -171,10 +171,12 @@ id = "chunk_list"
 title = "Chunk list of each pilot (own grid code)"
 path = "{semseg}/{pid}/chunks.parquet"
 kind = "table"
-status = "planned"
+status = "present"
 writer = "1.1"
 readers = ["1.2", "4.1", "4.4"]
-standard = "DS-3, DS-7"
+standard = "DS-3, DS-7, DS-22"
+notes = "schema in PLAN.md ICD I9 and DS-22 (D43); rule D44; 77: 157 chunks, 392: 227"
+updated = "2026-11-11"
 
 [[dataset]]
 id = "models_cache"

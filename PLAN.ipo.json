@@ -254,6 +254,10 @@
       [
         "b",
         "`fine_grid` `chunks.csv`\n(check only)"
+      ],
+      [
+        "e",
+        "edge cases: `tests/test_edge_grid.py`\n(bad footprint, pid, time, Git)"
       ]
     ],
     "process": [
@@ -276,7 +280,7 @@
         "test: same chunk IDs\nas `fine_grid`"
       ]
     ],
-    "edges": "a>p1 b>p2 p1>o1 p2>o2",
+    "edges": "a>p1 b>p2 e>p1 p1>o1 p2>o2",
     "titles": {
       "P": "Process: `semseg.grid`"
     }
