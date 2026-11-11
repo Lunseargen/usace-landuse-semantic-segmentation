@@ -95,7 +95,7 @@ Dated notes (2026-11-11):
 - All pids are checked before the first write. A bad pid or a bad frame writes nothing.
 - DS-21 `code_version` (D45): the full commit SHA, with `-dirty` when tracked files have changes.
   Without git or a commit, the command raises an error and writes nothing.
-- The files of 2026-11-11 have `-dirty` (uncommitted work). Run the command again after the commit.
+- The files of 2026-11-11 have `code_version` `6df2dd9c648ec151830e48c29d7e8df0ced66fdc` (commit "1.1 Chunk grid").
 
 ## Where the data is
 
