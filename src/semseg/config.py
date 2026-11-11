@@ -57,7 +57,10 @@ def label_settings(section):
         section = {}
     if not isinstance(section, dict):
         raise ValueError("config label must be a mapping")
-    out = {**LABEL_DEFAULTS, **{k: v for k, v in section.items() if k in LABEL_DEFAULTS}}
+    unknown = sorted(str(k) for k in section if k not in LABEL_DEFAULTS)
+    if unknown:
+        raise ValueError(f"config label has unknown keys {unknown}; allowed: {sorted(LABEL_DEFAULTS)}")
+    out = {**LABEL_DEFAULTS, **section}
     for key in ("box_threshold", "text_threshold"):
         if not _real(out[key]) or not 0 < out[key] <= 1:
             raise ValueError(f"config label.{key} must be a number with 0 < value <= 1, got {out[key]!r}")

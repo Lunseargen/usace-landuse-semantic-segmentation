@@ -149,11 +149,14 @@ def _check_gsd(src, path):
         raise ValueError(f"{path}: the tag gsd must be {NAIP_GSD!r} (NAIP source GSD 0.6 m, D57), got {gsd!r}")
 
 
+NAIP_YEARS = (2003, 2030)  # FM-95: the accepted range of the tag years
+
+
 def chunk_naip_year(path):
     """Return the NAIP year of a chunk file as an int, from the tag `years` (D57, DS-5).
 
     Raise FileNotFoundError for a missing file. Raise ValueError if the tag `gsd` is not "0.6", or
-    if `years` is missing or is not one 4-digit year (several years are refused). The call reads
+    if `years` is missing or is not one 4-digit year from 2003 to 2030 (several years are refused). The call reads
     the tags only, not the pixels.
     """
     path = Path(path)
@@ -164,7 +167,10 @@ def chunk_naip_year(path):
         years = src.tags().get("years")
     if not isinstance(years, str) or _YEAR_RE.fullmatch(years) is None:
         raise ValueError(f"{path}: the tag years must be one 4-digit year (D57), got {years!r}")
-    return int(years)
+    year = int(years)
+    if not NAIP_YEARS[0] <= year <= NAIP_YEARS[1]:
+        raise ValueError(f"{path}: the tag years must be from {NAIP_YEARS[0]} to {NAIP_YEARS[1]} (FM-95), got {years!r}")
+    return year
 
 
 def read_chunk(path):

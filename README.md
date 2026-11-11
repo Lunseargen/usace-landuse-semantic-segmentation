@@ -44,7 +44,7 @@ Resolved stack (from `uv.lock`):
 Package layout:
 
 - `src/semseg/`: the package. `semseg.config.load_config` reads `config.yaml`.
-- `config.yaml`: the pipeline config. Keys: `share_root` (the data folder, see below), `aois` (the pilot AOI IDs), `segment` and `demo` (task 1.2).
+- `config.yaml`: the pipeline config. Keys: `share_root` (the data folder, see below), `aois` (the pilot AOI IDs), `segment` and `demo` (task 1.2), and `label` (task 1.3).
 - `semseg.standard`: the data standard in code (see below).
 - `semseg._independence`: the scanner for D3 and R4. It finds imports of the `usace-landuse` code (`fine_grid`, `usace_veg`) in the source and in `pyproject.toml`.
 - `tests/`: the pytest suite.
@@ -53,6 +53,7 @@ Dated notes (2026-11-11):
 
 - `config.yaml` is the pipeline config. D15 covers only the registry (`data/REGISTRY.toml`).
 - `load_config` refuses an empty `aois` list and duplicate keys. It raises `ConfigError`.
+- `load_config` refuses an unknown key in the `label` section. It raises `ConfigError`. The key is not ignored.
 
 ## Data standard in code
 
@@ -161,7 +162,7 @@ uv run python -m semseg.segment --pid 77 --run
 - The Hugging Face hub writes the SAM 2 weights to `HF_HOME/hub` on the share. This is the only write that does not use `safe_write` (D48, 2026-11-11; data standard version 4).
 - The share refuses `FileLock` and `fchmod` (errno 95). Before the real load, `storage.use_soft_hf_locks()` makes the hub use `SoftFileLock` (D58, 2026-11-11). If a run stops in a download, remove the 0-byte lock file in `<semseg>/models/hub/.locks/` before the next run.
 - The test suite never loads the real model. `tests/conftest.py` blocks the model classes and the Hugging Face download functions (FM-71), the LangSAM, GroundingDINO, `torch.hub` and `transformers` loaders (D55, FM-89), and sets `HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` to 1.
-- NAIP source (D57, 2026-11-11, data standard version 5): `read_chunk` refuses a chunk file whose tag `gsd` is not `0.6` (`ValueError`). `chunk_naip_year(path)` returns the `years` tag (one year only). `run_chunks` writes that year into the `naip_year` key of the polygon file. The chunk files stay on the 0.5 m grid.
+- NAIP source (D57, 2026-11-11, data standard version 5): `read_chunk` refuses a chunk file whose tag `gsd` is not `0.6` (`ValueError`). `chunk_naip_year(path)` returns the `years` tag (one year only). The year must be from 2003 to 2030 (`NAIP_YEARS`, FM-95). Another year raises `ValueError`. `run_chunks` writes that year into the `naip_year` key of the polygon file. The chunk files stay on the 0.5 m grid.
 
 ## Polygon labels (`semseg.label`, task 1.3, 2026-11-11)
 
@@ -178,4 +179,7 @@ uv run python -m semseg.label --demo --run
 - The command follows `semseg.segment`: `--run` is required, the memory check (exit code 4) comes before the model load, and a run refuses an existing `runs/<run_id>/` (the label run ID has the method `langsam`).
 - The vote area-weights the 30 m pixels. A `code_vote` of 20 means "Developed" at level 1 (D56). A machine label is 0 or one of the 32 codes (D54, D60).
 - The run log `<semseg>/runs/<run_id>/log.json` has the key `codes`: 34 rows (code 0, code 20, the 32 codes) with the polygon count and area. A code with 0 polygons is a row with zeros (FM-2). Task 1.5 writes `results/demo/codes.csv`.
+- Map shape (FM-93): `vote_polygon` refuses an `nlcd` map and a `classf` map of different shape. It raises `ValueError`.
+- No mask (FM-94): a LangSAM `predict` result of `None` counts as no mask for that code.
+- Metadata (DS-21): the label step writes the current `data_standard` version into `polygons/<chunk>.gpkg`. The other metadata keys keep the values from the segment step.
 - The code is done with fake-model tests. The real run, and the quality of the 32 prompts, wait for Jack.

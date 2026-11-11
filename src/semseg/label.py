@@ -138,6 +138,8 @@ def pixel_weights(polygon, transform, shape):
 
 def vote_polygon(polygon, nlcd, classf, transform):
     """Return `(code_vote, p_vote)` of one polygon (DS-29, D52, D56). Raise ValueError for a bad polygon or map value."""
+    if nlcd.shape != classf.shape:
+        raise ValueError(f"the maps must have one shape, got {nlcd.shape} and {classf.shape} (FM-93)")
     _check_polygon(polygon, _grid_box(transform, nlcd.shape))
     buckets = {}
     for row, col, area in pixel_weights(polygon, transform, nlcd.shape):
@@ -176,7 +178,8 @@ def prompt_unions(model, rgb, config):
     unions = {}
     for code in standard.CODE_LIST:
         union = np.zeros((size, size), dtype=bool)
-        for mask in list(model.predict(rgb, standard.PROMPTS[code])):
+        masks = model.predict(rgb, standard.PROMPTS[code])
+        for mask in (() if masks is None else list(masks)):  # FM-94: None means no mask
             segment._check_mask(mask)
             union |= mask
         unions[code] = union
@@ -279,7 +282,9 @@ def write_labelled_polygons(gdf, roots, folder, chunk, metadata, label_metadata)
     out["code_vote"] = out["code_vote"].astype("int64")
     out["p_prompt"] = out["p_prompt"].astype("float64")
     out["p_vote"] = out["p_vote"].astype("float64")
+    # DS-21: the six 1.2 keys stay; only data_standard becomes the current version (the file now holds label columns).
     layer_metadata = {**{key: metadata[key] for key in standard.METADATA_KEYS},
+                      "data_standard": str(standard.DATA_STANDARD_VERSION),
                       **{key: label_metadata[key] for key in LABEL_KEYS}}
     return segment.write_polygon_layer(out, roots, folder, chunk, layer_metadata)
 

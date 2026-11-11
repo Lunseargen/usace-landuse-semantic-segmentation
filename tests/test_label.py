@@ -780,7 +780,10 @@ def test_labelled_file_keeps_the_1_2_columns_rows_and_metadata(tmp_path):
     assert back["p_prompt"].dtype == np.float64 and back["p_vote"].dtype == np.float64
     meta = pyogrio.read_info(path, layer="polygons")["layer_metadata"]
     for key in standard.METADATA_KEYS:
-        assert meta[key] == old_meta[key] == META[key]
+        if key == "data_standard":  # DS-21: the label step writes the current version
+            assert meta[key] == str(standard.DATA_STANDARD_VERSION) and old_meta[key] == META[key]
+        else:
+            assert meta[key] == old_meta[key] == META[key]
 
 
 def test_labelled_file_has_label_metadata_keys(tmp_path):
@@ -967,7 +970,7 @@ def test_run_keeps_polygons_and_writes_label_metadata_and_log_keys(tmp_path):
     assert back["polygon_id"].tolist() == base["polygon_id"].tolist()
     meta = pyogrio.read_info(gpkg(roots), layer="polygons")["layer_metadata"]
     for key in standard.METADATA_KEYS:
-        assert meta[key] == META[key]
+        assert meta[key] == (str(standard.DATA_STANDARD_VERSION) if key == "data_standard" else META[key])
     assert meta["label_run_id"] == LRUN and meta["label_code_version"].strip()
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", meta["label_created"])
     assert all(name in meta["label_sources"] for name in ("nlcd_2022.tif", "classf_2022.tif", CHUNK))

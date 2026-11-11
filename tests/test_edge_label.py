@@ -1,7 +1,7 @@
 """Edge-hunter tests of task 1.3 (`semseg.label`, D51 to D57). Factory edge hunter, 2026-11-11.
 
-Every test uses fake models, synthetic rasters and `tmp_path` roots (D22). Faults that the code still
-has are `xfail(strict=True)` with the FM row; see `.factory/1.3/edges.md`.
+Every test uses fake models, synthetic rasters and `tmp_path` roots (D22). The faults FM-93 to FM-96
+are fixed; each test names its FM row.
 """
 
 import json
@@ -222,7 +222,6 @@ def test_edge_vote_layers_with_a_value_not_in_the_legend_inside_the_chunk_are_re
         label.vote_polygon(px(5, 5), nn, cc, tr)
 
 
-@pytest.mark.xfail(strict=True, raises=IndexError, reason="FM-93: classf smaller than nlcd gives IndexError, not ValueError")
 def test_edge_vote_polygon_with_maps_of_different_shape_is_a_value_error():
     nlcd, _ = grids(71)
     classf = np.zeros((16, 16), dtype=np.uint8)
@@ -238,7 +237,6 @@ def test_edge_prompt_empty_mask_list_gives_all_false_unions():
     assert len(unions) == len(standard.CODE_LIST) == 32 and not any(u.any() for u in unions.values())
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError, reason="FM-94: a model that returns None gives TypeError, not ValueError or no mask")
 def test_edge_prompt_model_returning_none_is_a_clean_result():
     class NoneModel(FakeText):
         def predict(self, rgb, prompt):
@@ -443,7 +441,8 @@ def test_edge_run_ds21_keys_from_another_run_are_kept_not_overwritten(tmp_path):
     do_run(roots)
     info = pyogrio.read_info(gpkg(roots), layer="polygons")["layer_metadata"]
     for key in standard.METADATA_KEYS:
-        assert info[key] == META[key] or key == "created"
+        expected = str(standard.DATA_STANDARD_VERSION) if key == "data_standard" else META[key]
+        assert info[key] == expected or key == "created"
     assert info["naip_year"] == "2022"
 
 
@@ -561,7 +560,6 @@ def test_edge_d57_missing_years_tag_is_refused(tmp_path):
 
 
 @pytest.mark.parametrize("years", ["0000", "0022", "1066", "9999"])
-@pytest.mark.xfail(strict=True, reason="FM-95: a 4-digit year outside the NAIP years (2003 and later) is accepted; '0022' becomes naip_year '22'")
 def test_edge_d57_year_outside_the_naip_range_is_refused(tmp_path, years):
     roots = run_with_tags(tmp_path, {"gsd": "0.6", "years": years})
     with pytest.raises(ValueError):
@@ -603,7 +601,6 @@ def test_edge_label_config_types_and_bounds():
     assert semseg_config.label_settings(None) == semseg_config.LABEL_DEFAULTS
 
 
-@pytest.mark.xfail(strict=True, reason="FM-96: an unknown key in `label` (a typo of min_overlap) is dropped silently and the default 0.5 applies")
 def test_edge_label_config_unknown_key_is_refused():
     with pytest.raises(ValueError):
         semseg_config.label_settings({"min_overlp": 0.9})
