@@ -9,6 +9,7 @@ dependencies = [
     "torch>=2.9",
     "torchvision",
     "pyyaml",
+    "rasterio",
 ]
 
 [dependency-groups]

@@ -1432,6 +1432,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
+    { name = "rasterio" },
     { name = "segment-geospatial", extra = ["samgeo2", "text"] },
     { name = "torch" },
     { name = "torchvision" },
@@ -1446,6 +1447,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pyyaml" },
+    { name = "rasterio" },
     { name = "segment-geospatial", extras = ["samgeo2", "text"], specifier = "==1.4.2" },
     { name = "torch", specifier = ">=2.9", index = "https://download.pytorch.org/whl/cu130" },
     { name = "torchvision", index = "https://download.pytorch.org/whl/cu130" },

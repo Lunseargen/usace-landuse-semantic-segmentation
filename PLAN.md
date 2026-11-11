@@ -58,14 +58,14 @@ Limits:
 
 | ID | Requirement | Measure | Work items | Verification | Level | Status |
 |---|---|---|---|---|---|---|
-| R1 | Each output raster and each cell ID lies on the Annual NLCD 30 m grid (EPSG:5070, DS-1 to DS-4) | MOP: 0 cells off the grid | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_grid_lattice` | Unit | open |
+| R1 | Each output raster and each cell ID lies on the Annual NLCD 30 m grid (EPSG:5070, DS-1 to DS-4) | MOP: 0 cells off the grid | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_grid_lattice` | Unit | pass (2026-11-11) |
 | R2 | The chunk IDs of the code agree with the `fine_grid` chunk lists | MOP: 0 different IDs on 77 and 392 | [1.1](#t-1-1) | `tests/test_grid.py::test_chunks_match_fine_grid` | Integration | open |
-| R3 | Each class code comes from the code table of the data standard (DS-11, DS-12) | MOP: 0 unknown codes | [0.2](#t-0-2), [1.3](#t-1-3) | `tests/test_standard.py::test_code_table` | Unit | open |
+| R3 | Each class code comes from the code table of the data standard (DS-11, DS-12) | MOP: 0 unknown codes | [0.2](#t-0-2), [1.3](#t-1-3) | `tests/test_standard.py::test_code_table` | Unit | pass (2026-11-11) |
 | R4 | No module imports or copies `fine_grid` or `usace_veg` | MOP: 0 imports | [0.1](#t-0-1) | `tests/test_independent.py::test_no_foreign_imports` | Unit | pass (2026-11-11) |
 | R5 | A missing share stops the step with exit code 3, and no step writes under a read-only root or to the local disk (DS-23 to DS-26) | MOP: 0 local writes | [0.3](#t-0-3) | `tests/test_storage.py::test_share_missing_exit_3` | Unit | open |
 | R6 | The data registry agrees with the files on disk and the plan | MOP: `registry_check.py` exit 0 | [0.3](#t-0-3) | `registry_check.py data/REGISTRY.toml --plan PLAN.md` | Integration | open |
 | R7 | The class shares of a cell sum to 1 ± 0.001 where the cell has a photo | MOP: 0 cells outside the limit | [1.4](#t-1-4) | `tests/test_cells.py::test_shares_sum_to_one` | Unit | open |
-| R8 | The derived NLCD code and USACE-M code follow DS-14 and DS-15 | MOP: each limit tested | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_derived_nlcd_limits` | Unit | open |
+| R8 | The derived NLCD code and USACE-M code follow DS-14 and DS-15 | MOP: each limit tested | [0.2](#t-0-2), [1.4](#t-1-4) | `tests/test_standard.py::test_derived_nlcd_limits` | Unit | pass (2026-11-11) |
 | R9 | Each cell record has the history 1985–2025 (NLCD, USACE-M, TCC) and its sources (DS-20, DS-21) | MOP: 41 years in each record | [1.4](#t-1-4) | `tests/test_cells.py::test_record_schema` | Integration | open |
 | R10 | The demo runs from NAIP to the agreement tables on 6 chunks of 77 | MOE: Jack reads the demo report | [1.5](#t-1-5) | `tests/test_demo.py::test_demo_on_fixture_chunk` and the report in `results/demo/` | System | open |
 | R11 | Each API call except login needs a valid bearer token; passwords use argon2id; 5 failed logins in 1 minute block the address | MOP: 0 calls without a token | [2.1](#t-2-1) | `tests/test_app_auth.py::test_api_needs_token` | Integration | open |
@@ -81,7 +81,7 @@ Limits:
 
 ## 2. Stages and tasks (WBS + IPO)
 
-Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). The next task is [0.2 Data standard in code](#t-0-2).
+Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). 0.2 Data standard in code is done (`semseg.standard`, data standard version 2, draft decisions D27 to D34 for Jack's review; 543 tests, 100 % coverage). The next task is [0.3 Storage, registry and set-up check](#t-0-3).
 
 ```mermaid
 flowchart LR
@@ -188,7 +188,7 @@ flowchart LR
 <a id="t-0-2"></a>
 > **CAUTION:** A wrong grid origin moves every cell, and all agreement numbers become wrong (FM-1). Test each DS rule against a real stack raster before any later stage uses the grid.
 
-- [ ] **0.2 Data standard in code** ([D5](DECISIONS.md), [D6](DECISIONS.md), [D19](DECISIONS.md))
+- [x] **0.2 Data standard in code** ([D5](DECISIONS.md), [D6](DECISIONS.md), [D19](DECISIONS.md), [D27](DECISIONS.md), [D28](DECISIONS.md), [D29](DECISIONS.md), [D30](DECISIONS.md), [D31](DECISIONS.md), [D32](DECISIONS.md), [D33](DECISIONS.md), [D34](DECISIONS.md))
 
   <details>
   <summary>0.2 IPO card</summary>
@@ -199,10 +199,17 @@ flowchart LR
       subgraph I ["Input"]
           a["<code>docs/DATA_STANDARD.md</code><br/>DS-1 to DS-28"]:::in
           b["<code>usace-landuse</code> <code>scheme.py</code><br/>(USACE-M codes)"]:::in
+          c["edge cases: <code>tests/test_edge_standard.py</code><br/>grid, code and ID inputs"]:::in
       end
       subgraph P ["Process: <code>semseg.standard</code>"]
           p1["grid math: cell, chunk, pixel<br/>→ IDs and round trips"]:::pr
           p2["code table, colours<br/>→ NLCD and USACE-M maps"]:::pr
+          e1["cell ID and row: int64 limit"]:::pr
+          e2["chunk, project, run and polygon IDs: Unicode digits, leading zeros"]:::pr
+          e3["share sum: 1.001 and 0.999 bound"]:::pr
+          e4["run ID: impossible date, wrong type, newline"]:::pr
+          e5["folder names: NUL, backslash, reserved names"]:::pr
+          e6["codes: float and array inputs"]:::pr
       end
       subgraph O ["Output"]
           o1["<code>src/semseg/standard.py</code><br/>one function for each rule"]:::ou
@@ -215,6 +222,18 @@ flowchart LR
       p2 --> o1
       p1 --> o2
       p2 --> o2
+      c --> e1
+      c --> e2
+      c --> e3
+      c --> e4
+      c --> e5
+      c --> e6
+      e1 --> o2
+      e2 --> o2
+      e3 --> o2
+      e4 --> o2
+      e5 --> o2
+      e6 --> o2
       classDef in fill:#dbeafe,stroke:#2563eb,color:#111
       classDef pr fill:#fef3c7,stroke:#d97706,color:#111
       classDef ou fill:#dcfce7,stroke:#16a34a,color:#111
@@ -1299,6 +1318,12 @@ Add a row when a new item appears. Write "closed <date>" in the action column wh
 | Risk | The independence test misses a foreign import or copy | FM-16 | `test_scanner_catches_planted_imports`; AST scan | [0.1](#t-0-1) |
 | Risk | The scanner misses a foreign import made with a keyword, a built name, or an alias | FM-19 | `test_edge_keyword_argument_import`; `test_edge_built_name_import`; `test_edge_aliased_import_call` | [0.1](#t-0-1) |
 | Risk | A wrong `share_root` or `aois` type reaches a path call or a write | FM-22 | `test_edge_share_root_must_be_nonempty_string`; `test_edge_aois_must_be_list_of_int`; `test_edge_share_root_must_be_absolute` | [0.1](#t-0-1) |
+| Risk | The USACE-M map differs from `scheme.py` | FM-25 | `test_usace_m_matches_scheme`; changes in DS-16 | [0.2](#t-0-2) |
+| Risk | A cell ID is wrong at an edge (1 ULP, negative offset) | FM-26 | `test_cell_id_roundtrip`; `test_edge_cell_of_point_row_one_ulp_inside_cell`; integer or `Fraction` math (D30) | [0.2](#t-0-2) |
+| Risk | A code, colour or limit is wrong, or a tie is missed by 1 ULP | FM-27 | `test_code_table`; `test_derived_nlcd_limits`; sums rounded to 9 decimals (D34) | [0.2](#t-0-2) |
+| Risk | A grid function rounds an off-lattice point | FM-28 | `test_off_lattice_raises`; `test_edge_on_lattice_one_ulp_off_x` | [0.2](#t-0-2) |
+| Risk | `test_grid_lattice` is skipped and the suite is green | FM-29 | `test_grid_lattice_not_skipped`; no skip, exit 3 | [0.2](#t-0-2) |
+| Risk | A cell ID or row above int64 gives a wrong join | FM-30 | `test_edge_cell_id_int64_limit`; `test_edge_cell_rowcol_int64_limit` | [0.2](#t-0-2) |
 | Assumption | SAM 2 and LangSAM run inside about 8 GB of GPU memory | — | measure in the first GPU run of 1.2 | [1.2](#t-1-2) |
 | Assumption | The SAM 2 and Grounding DINO weights download from Hugging Face with no token | — | N6 check | [0.3](#t-0-3) |
 | Assumption | The polygon label method (prompts + vote + classifier) is good enough; Jack: "whatever works" (2026-11-11) | — | compare the 3 methods in the demo report and in 5.3 | [1.5](#t-1-5) |
@@ -1328,7 +1353,7 @@ n0              = 1.96² × 0.5 × 0.5 / 0.05² = 384.16
 | Agreement with NLCD 2022 on the demo chunks | MOP | not measured | [1.5](#t-1-5) |
 | Share of polygons with a prompt code | TPM | not measured (target ≥ 90 % by 2026-11-25) | [1.3](#t-1-3) |
 | Level-1 accuracy of the classifier (cross-validated) | TPM | not measured (target ≥ 85 % by 2026-12-15) | [4.3](#t-4-3) |
-| Open RTM rows | TPM | 20 of 20 open (2026-11-11) | section 1 |
+| Open RTM rows | TPM | 16 of 20 open (2026-11-11) | section 1 |
 
 Arithmetic: 20 × 16 = 320, + 80 = 400; 40 × 16 = 640, + 200 = 840. Cells: 15,673 ac / 0.2224 ac
 (one 30 m cell) = 70,474; 30,608 ac / 0.2224 ac = 137,629. n for 77: 384.16 / (1 + 383.16 /
@@ -1405,7 +1430,7 @@ Fields: DS-20 (with DS-8, DS-14, DS-15). Rule: shares sum to 1 ± 0.001 where `p
 | `seed` | int | — | in the file metadata |
 
 <a id="i7"></a>
-**I7 stack layers** · format: GeoTIFF, 30 m · registry: `stack_nlcd`, `stack_classf`, `stack_tcc`, `stack_boundary`, `stack_vectors` · owner: external · test: `test_grid_lattice`
+**I7 stack layers** · format: GeoTIFF, 30 m · registry: `stack_nlcd`, `stack_classf`, `stack_tcc`, `stack_boundary`, `stack_vectors` · owner: external (test in [0.2](#t-0-2)) · test: `test_grid_lattice`
 
 Rule: the same lattice as DS-2; read only (DS-23).
 
@@ -1453,6 +1478,18 @@ action, a RAID Risk row, a CAUTION, and a test. Run `render_ipo.py ... --pareto`
 | FM-21 | 0.1/e3 | the scanner does not follow a symlinked directory and skips `.pyw` and `.pyi` | a foreign import hides behind a link | `rglob("*.py")` does not follow directory links in Python 3.12 | `test_edge_symlinked_directory_is_scanned`; `test_edge_other_python_suffixes` | 6 | 2 | 6 | 72 | Prevent: walk with `os.walk(followlinks=True)` with a visited set; add the suffixes; Detect: `test_edge_symlinked_directory_is_scanned`, `test_edge_other_python_suffixes` |
 | FM-22 | 0.1/e4 | `load_config` returns a wrong type: `share_root` null, int, bool, list, empty or relative; `aois` null, scalar, str, or a list with str, bool, float, NaN | a later path call fails far from the cause, or a write lands in the current directory (D23) | only the key names are checked | `test_edge_share_root_must_be_nonempty_string`; `test_edge_aois_must_be_list_of_int`; `test_edge_share_root_must_be_absolute` | 7 | 3 | 5 | 105 | Prevent: validate `share_root` as a non-empty absolute `str` and `aois` as a list of `int` (not `bool`); Detect: `test_edge_share_root_must_be_nonempty_string`, `test_edge_aois_must_be_list_of_int`, `test_edge_share_root_must_be_absolute` |
 | FM-23 | 0.1/e5 | `load_config` accepts a duplicate key (last wins) and raises `yaml.YAMLError`, not `ValueError` | a silent wrong value; a caller that catches `ValueError` misses the error | `yaml.safe_load` default behaviour | `test_edge_duplicate_key_refused`; `test_edge_malformed_yaml_is_value_error` | 4 | 2 | 5 | 40 | Prevent: a loader that refuses duplicate keys; wrap `YAMLError` in `ValueError`; Detect: `test_edge_duplicate_key_refused`, `test_edge_malformed_yaml_is_value_error` |
+| FM-24 | 0.2/a | a DS rule has no function and no test | a rule is not enforced; later stages break it | the rule table has 28 rules and a rule is missed | `test_every_ds_rule_has_test` | 6 | 4 | 3 | 72 | Detect: `test_every_ds_rule_has_test` reads the DS-n IDs from `docs/DATA_STANDARD.md` and checks one test for each |
+| FM-25 | 0.2/b | the USACE-M map differs from `scheme.py` | the tree class and the leaf type are wrong in the composition | stale copy of the codes; a swapped code; the import ban (D3) means no live link | `test_usace_m_matches_scheme` | 7 | 4 | 4 | 112 | Prevent: read `scheme.py` as text (no import, D3); Detect: `test_usace_m_matches_scheme`; record each change in DS-16; R8 |
+| FM-26 | 0.2/p1 | cell, chunk or pixel ID is wrong at an edge (row and col swapped, float rounding, negative offset) | a cell joins to the wrong cell; round trip fails | float division instead of integer; floor of a negative value | `test_cell_id_roundtrip`; `test_chunk_ids_match_chunks_csv`; `test_edge_cell_of_point_row_one_ulp_inside_cell`; `test_edge_cell_of_point_col_one_ulp_inside_cell` | 8 | 3 | 6 | 144 | Prevent: integer or `Fraction` math, floor for a negative value (D30); Detect: the four tests; R1; the edge hunt raised D from 3 to 6 |
+| FM-27 | 0.2/p2 | a code, a colour or a limit is wrong (0.20 as greater than, level-1 code missing, wrong colour) | wrong derived NLCD and USACE-M classes; the legend does not match | off-by-one at a limit; float equality; a typed colour | `test_code_table`; `test_derived_nlcd_limits`; `test_usace_m_limits`; `test_edge_derived_nlcd_decimal_shares_at_limits`; `test_edge_usace_m_decimal_shares_at_limits`; `test_edge_pixel_count_shares_agree_with_integer_arithmetic` | 7 | 4 | 6 | 168 | Prevent: sums rounded to 9 decimals before the limits (D34); Detect: the six tests; R3, R8; the edge hunt raised D from 3 to 6 |
+| FM-28 | 0.2/o1 | a grid function accepts a point off the lattice and gives a rounded ID | silent wrong cells; FM-1 comes back by a different way | the function rounds, it does not check | `test_off_lattice_raises`; `test_edge_on_lattice_one_ulp_off_x`; `test_edge_on_lattice_one_ulp_off_y`; `test_edge_on_lattice_float32_off_lattice`; `test_edge_on_lattice_int64_overflow` | 7 | 4 | 6 | 168 | Prevent: raise `ValueError` if (x − x0) mod 30 ≠ 0 (D30); Detect: `test_off_lattice_raises` for 1 m and 0.5 m offsets and the edge tests; R1; the edge hunt raised D from 5 to 6 |
+| FM-29 | 0.2/o2 | `test_grid_lattice` is skipped or reads no raster, and the suite is green | the grid is never checked on a real raster (FM-1 stays open) | `skipif` when the share is not mounted; empty file list | `test_grid_lattice_not_skipped`; `test_grid_lattice` | 8 | 5 | 4 | 160 | Prevent: no skip; the share guard stops with exit 3 (FM-5); Detect: `test_grid_lattice_not_skipped` asserts that `nlcd_2022.tif` of 77 and 392 were opened; R1 |
+| FM-30 | 0.2/e1 | `cell_id` and `cell_rowcol` accept a row or ID above int64 (row 9 223 372 036 855 gives 9.2e18) | the ID overflows in parquet or numpy; a wrong or failed join | no upper bound on the row | `test_edge_cell_id_int64_limit`; `test_edge_cell_rowcol_int64_limit`; `test_edge_cell_id_absurd_row` | 7 | 2 | 4 | 56 | Prevent: raise `ValueError` if `row * 1_000_000 + col > 2**63 - 1`; Detect: the three tests |
+| FM-31 | 0.2/e2 | `parse_chunk_id`, `parse_project_folder`, `check_run_id` accept Unicode digits (`r1` + Arabic-Indic 3 gives row 13); `parse_polygon_id` keeps leading zeros (`r01_c2`, `_007`) | an ID does not round trip; two names for one chunk | `\d` matches Unicode digits in a `str` pattern; the polygon regex is `r\d+` | `test_edge_parse_chunk_id_unicode_digit_after_ascii`; `test_edge_parse_project_folder_unicode_digit`; `test_edge_run_id_unicode_digits`; `test_edge_polygon_id_roundtrip_is_exact` | 6 | 2 | 4 | 48 | Prevent: `[0-9]` or `re.ASCII`; the chunk rule in `parse_polygon_id`; Detect: the four tests |
+| FM-32 | 0.2/e3 | the share sum 1.001 is accepted and 0.999 is rejected | the DS-20 bound is not symmetric; a valid row fails | `abs(fsum - 1) <= 0.001` in binary floats | `test_edge_shares_sum_boundary_is_symmetric` | 3 | 3 | 5 | 45 | Prevent: round the sum to 9 decimals, then compare (D34); Detect: the test |
+| FM-33 | 0.2/e4 | `check_run_id` accepts an impossible date (`20261341-2561-x`); `run_id` raises `AttributeError` for a non-datetime; `RUN_ID_RE` with `re.match` accepts a trailing newline | a run folder with a date that no calendar has; a wrong exception type; a consumer that uses `re.match` accepts `id\n` | the check is a regex only (spec A5 gives `^...$`) | `test_edge_check_run_id_impossible_date`; `test_edge_run_id_wrong_type_is_value_error`; `test_edge_run_id_re_constant_with_re_match` | 4 | 3 | 4 | 48 | Prevent: parse with `datetime.strptime` in `check_run_id` (D34); catch `AttributeError`; `\Z` instead of `$`; Detect: the three tests |
+| FM-34 | 0.2/e5 | `check_name` accepts a NUL byte, a backslash, and a reserved name with a trailing blank (`aux `) | the SMB share changes or refuses the name; a backslash can reach a parent folder | the check lists only `/`, empty, dots and four names | `test_edge_check_name_nul`; `test_edge_check_name_backslash`; `test_edge_check_name_reserved_with_trailing_blank` | 6 | 2 | 5 | 60 | Prevent: refuse `\x00`, `\\`, control characters; strip trailing blanks and dots before the reserved test; Detect: the three tests |
+| FM-35 | 0.2/e6 | `level1(41.0)` and `stack_nlcd_value(11.0)` return a float; `stack_nlcd_value(np.array([250]))` returns 0 | a float code in an integer column; an array passes as a scalar | `in` and `==` accept a float or a 1-element array | `test_edge_level1_float_code_returns_int`; `test_edge_stack_nlcd_value_float_returns_int`; `test_edge_stack_nlcd_value_array` | 4 | 2 | 5 | 40 | Prevent: `_int(value)` first; a float code raises `ValueError`; Detect: the three tests |
 
 FTA for the worst result (FM-3 and FM-4 have S ≥ 9):
 

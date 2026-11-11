@@ -44,6 +44,7 @@ Package layout:
 
 - `src/semseg/`: the package. `semseg.config.load_config` reads `config.yaml`.
 - `config.yaml`: the pipeline config. Keys: `share_root` (the data folder, see below) and `aois` (the pilot AOI IDs).
+- `semseg.standard`: the data standard in code (see below).
 - `semseg._independence`: the scanner for D3 and R4. It finds imports of the `usace-landuse` code (`fine_grid`, `usace_veg`) in the source and in `pyproject.toml`.
 - `tests/`: the pytest suite.
 
@@ -51,6 +52,27 @@ Dated notes (2026-11-11):
 
 - `config.yaml` is the pipeline config. D15 covers only the registry (`data/REGISTRY.toml`).
 - `load_config` refuses an empty `aois` list and duplicate keys. It raises `ConfigError`.
+
+## Data standard in code
+
+`semseg.standard` holds the data standard (`docs/DATA_STANDARD.md`, version 2). It has one pure
+function or constant for each DS rule. It does no file access and no storage (task 0.3).
+
+Main names:
+
+- Grid: `cell_of_bounds`, `cell_id`, chunk IDs (`chunk_of_bounds`).
+- Codes: `CODES`, `DERIVED_NLCD`, `colour`, `level1`.
+- Derived codes: `derived_nlcd`, `derived_usace_m`, `usace_m_flags`, `top_code`.
+
+`tests/test_standard.py` has one test per DS rule. `test_grid_lattice` reads the real stack
+rasters of 77 and 392 (read only). It fails, and never skips, when the share is missing.
+It reads `usace_veg` `scheme.py` as text (D3).
+
+Dated notes (2026-11-11):
+
+- Grid math is exact (`int` or `Fraction`). Bounds off the 30 m lattice raise `ValueError`.
+- Share sums round to 9 decimals before each limit (D34).
+- D27 to D34 are `Draft (factory):` decisions. Jack reviews them.
 
 ## Where the data is
 

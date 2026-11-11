@@ -113,6 +113,10 @@
       [
         "b",
         "`usace-landuse` `scheme.py`\n(USACE-M codes)"
+      ],
+      [
+        "c",
+        "edge cases: `tests/test_edge_standard.py`\ngrid, code and ID inputs"
       ]
     ],
     "process": [
@@ -123,6 +127,30 @@
       [
         "p2",
         "code table, colours\n→ NLCD and USACE-M maps"
+      ],
+      [
+        "e1",
+        "cell ID and row: int64 limit"
+      ],
+      [
+        "e2",
+        "chunk, project, run and polygon IDs: Unicode digits, leading zeros"
+      ],
+      [
+        "e3",
+        "share sum: 1.001 and 0.999 bound"
+      ],
+      [
+        "e4",
+        "run ID: impossible date, wrong type, newline"
+      ],
+      [
+        "e5",
+        "folder names: NUL, backslash, reserved names"
+      ],
+      [
+        "e6",
+        "codes: float and array inputs"
       ]
     ],
     "output": [
@@ -135,7 +163,7 @@
         "`tests/test_standard.py`\none test for each DS rule"
       ]
     ],
-    "edges": "a>p1 a>p2 b>p2 p1>o1 p2>o1 p1>o2 p2>o2",
+    "edges": "a>p1 a>p2 b>p2 p1>o1 p2>o1 p1>o2 p2>o2 c>e1 c>e2 c>e3 c>e4 c>e5 c>e6 e1>o2 e2>o2 e3>o2 e4>o2 e5>o2 e6>o2",
     "titles": {
       "P": "Process: `semseg.standard`"
     }
