@@ -79,10 +79,11 @@ Limits:
 | R18 | The estimator gives overall, user and producer accuracy and the area of each class with 95 % intervals (Stehman stratified estimator) | MOP: equal to a published example | [5.3](#t-5-3) | `tests/test_evaluate.py::test_stehman_example` | Unit | open |
 | R19 | The evaluation uses only blind labels (mode `eval`), never the map vote or training labels | MOP: 0 other labels | [5.3](#t-5-3) | `tests/test_evaluate.py::test_only_eval_labels` | Unit | open |
 | R20 | Level-1 accuracy ≥ 85 % pooled, no pilot below 75 %, and higher agreement with the blind labels than NLCD 2022 | MOE: the gate result | [5.3](#t-5-3) | `results/eval/gate.md` | Acceptance | open |
+| R21 | The polygons of a chunk partition it: coverage ≥ 0.999 and overlap 0; gap-fill share ≤ 0.10; 0 land polygons over 4 ha; vote-pure share ≥ 0.70; ≤ 60 s for each chunk | MOP: each value met on the 12 tune chunks (D65) | [1.6](#t-1-6) | `tests/test_postprocess.py::test_coverage_one_overlap_zero` and `results/tune/summary.csv` | Unit | open |
 
 ## 2. Stages and tasks (WBS + IPO)
 
-Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). 0.2 Data standard in code is done (`semseg.standard`, data standard version 2, draft decisions D27 to D34 for Jack's review; 543 tests, 100 % coverage). 0.3 Storage, registry and set-up check is done (`semseg.storage`, `semseg.setup_check`; `results/setup_check.json` passes with 157 + 227 = 384 NAIP chunks; draft decisions D35 to D40 for Jack's review; 734 tests, 100 % coverage). Stage 0 is done, and its TRR is due. 1.1 Chunk grid is done (`semseg.grid`; `chunks.parquet` for 77 (157 chunks) and 392 (227 chunks) on the share). 1.2 SAM 2 polygons: the code is done (`semseg.segment`, fake-model tests; data standard version 4; 1197 tests, 100 % coverage). Its real run waits for Jack (D22, D42), so [1.2](#t-1-2) stays open. The draft decisions D27 to D50 wait for Jack's review. 1.3 Polygon labels: the code and the fake-model tests are done (`semseg.label`, data standard version 6; 1488 tests, 100 % coverage). Its real LangSAM run waits for Jack (D22), so [1.3](#t-1-3) stays open. The next task is 1.2T SAM 2 tuning for full coverage.
+Status (2026-11-11): 0.1 Repository set-up is done (uv env: torch 2.14.1+cu130, samgeo 1.4.2; 135 tests, 100 % coverage). 0.2 Data standard in code is done (`semseg.standard`, data standard version 2, draft decisions D27 to D34 for Jack's review; 543 tests, 100 % coverage). 0.3 Storage, registry and set-up check is done (`semseg.storage`, `semseg.setup_check`; `results/setup_check.json` passes with 157 + 227 = 384 NAIP chunks; draft decisions D35 to D40 for Jack's review; 734 tests, 100 % coverage). Stage 0 is done, and its TRR is due. 1.1 Chunk grid is done (`semseg.grid`; `chunks.parquet` for 77 (157 chunks) and 392 (227 chunks) on the share). 1.2 SAM 2 polygons: the code is done (`semseg.segment`, fake-model tests; data standard version 4; 1197 tests, 100 % coverage). Its real run waits for Jack (D22, D42), so [1.2](#t-1-2) stays open. The draft decisions D27 to D50 wait for Jack's review. 1.3 Polygon labels: the code and the fake-model tests are done (`semseg.label`, data standard version 6; 1488 tests, 100 % coverage). Its real LangSAM run waits for Jack (D22), so [1.3](#t-1-3) stays open. The next task is [1.6](#t-1-6) SAM 2 tuning for full coverage.
 
 ```mermaid
 flowchart LR
@@ -400,7 +401,46 @@ flowchart LR
       style O fill:none,stroke:none
   ```
 
-  **Done when:** on a fixture chunk (a test with a fake model) the polygons are valid, inside the chunk, in EPSG:5070, with DS-21 metadata; after Jack says "run", the 6 demo chunks have polygon files and the run log shows the GPU memory.
+  **Done when:** on a fixture chunk (a test with a fake model) the polygons are valid, inside the chunk, in EPSG:5070, with DS-21 metadata; after Jack says "run", the 6 demo chunks have polygon files and the run log shows the GPU memory, with the 1.6 pick.
+
+  </details>
+
+<a id="t-1-6"></a>
+- [ ] **1.6 SAM 2 tuning for full coverage** ([D61](DECISIONS.md), [D62](DECISIONS.md), [D63](DECISIONS.md), [D64](DECISIONS.md), [D65](DECISIONS.md), [D66](DECISIONS.md), [D67](DECISIONS.md))
+  Tune SAM 2 on 12 chunks (6 of 77, 6 of 392) so that the polygons cover each chunk with no overlap. Design: `.factory/1.6/design.md`.
+
+  <details>
+  <summary>1.6 IPO card</summary>
+
+  <!-- ipo:1.6 -->
+  ```mermaid
+  flowchart LR
+      subgraph I ["Input"]
+          a["NAIP chunks<br/>12 tune chunks"]:::in
+          b["SAM 2 weights<br/>(<code>HF_HOME</code> on the share)"]:::in
+          c["<code>nlcd_2022</code>, <code>classf_2022</code><br/>(vote)"]:::in
+      end
+      subgraph P ["Process: <code>semseg.tune</code>"]
+          p1["tiles 1024 / 448 → SAM 2 masks (C0 to C10)<br/>→ post-process → label raster → polygons<br/>→ MOPs and pick rule"]:::pr
+      end
+      subgraph O ["Output"]
+          o1["<code>runs/&lt;run_id&gt;/tune.json</code>"]:::ou
+          o2["<code>results/tune/summary.csv</code>"]:::ou
+      end
+      a --> p1
+      b --> p1
+      c --> p1
+      p1 --> o1
+      p1 --> o2
+      classDef in fill:#dbeafe,stroke:#2563eb,color:#111
+      classDef pr fill:#fef3c7,stroke:#d97706,color:#111
+      classDef ou fill:#dcfce7,stroke:#16a34a,color:#111
+      style I fill:none,stroke:none
+      style P fill:none,stroke:none
+      style O fill:none,stroke:none
+  ```
+
+  **Done when:** (fake-model part) the tests with fake masks pass: the overlap rule, the gap fill, the round trip `labels_to_polygons` to raster, the tiler offsets, the inner-edge drop, the pick rule, and `--run` is required; (real part) after the tune run (D67), the pick meets every value of R21 on the 12 tune chunks, `results/tune/summary.csv` has one row for each config, and Jack sees the pictures of the pick. If no config passes, `semseg.tune` exits 5 and reports the best one.
 
   </details>
 
@@ -1359,6 +1399,12 @@ Add a row when a new item appears. Write "closed <date>" in the action column wh
 | Risk | The vote reads a wrong layer, an unknown classf code, or 250 | FM-88 | `test_vote_reads_only_nlcd_2022_and_classf_2022`; `test_edge_nodata_250_never_wins_the_vote` | [1.3](#t-1-3) |
 | Risk | Two codes claim one polygon; `p_prompt` is outside 0..1 | FM-91 | `test_prompt_overlap_two_codes_takes_the_larger_p_and_ties_take_the_lowest_code` | [1.3](#t-1-3) |
 | Risk | A code has no prompt or a duplicate prompt | FM-87 | `test_prompt_table_has_one_unique_nonempty_prompt_for_each_code_except_0` | [1.3](#t-1-3) |
+| Risk | Gap fill makes giant mixed segments | FM-98 | the gap-fill and polygon-size MOPs; `gap_split` | [1.6](#t-1-6) |
+| Risk | A simplify or a minimum area for each polygon opens gaps and overlaps again | FM-99 | `labels_to_polygons`; the round-trip test | [1.6](#t-1-6) |
+| Risk | Tile seams cut or duplicate objects | FM-100 | the edge-filter test; the seam metric | [1.6](#t-1-6) |
+| Risk | A dense config uses all memory or hurts the vLLM server | FM-101 | the D47 check for each chunk; box-crop masks | [1.6](#t-1-6) |
+| Risk | Tuning to the map vote makes the map the truth (D8) | FM-102 | several criteria; the size limit; Jack sees the pictures (D65) | [1.6](#t-1-6) |
+| Risk | A test loads the real SAM 2 | FM-104 | `GUARDED` entry for `SAM2AutomaticMaskGenerator` | [1.6](#t-1-6) |
 | Assumption | SAM 2 and LangSAM run inside about 8 GB of GPU memory | — | measure in the first GPU run of 1.2 | [1.2](#t-1-2) |
 | Assumption | The SAM 2 and Grounding DINO weights download from Hugging Face with no token | — | N6 check | [0.3](#t-0-3) |
 | Assumption | The polygon label method (prompts + vote + classifier) is good enough; Jack: "whatever works" (2026-11-11) | — | compare the 3 methods in the demo report and in 5.3 | [1.5](#t-1-5) |
@@ -1387,8 +1433,10 @@ n0              = 1.96² × 0.5 × 0.5 / 0.05² = 384.16
 | Level-1 accuracy, pooled | MOE | not measured (gate ≥ 85 %) | [5.3](#t-5-3) |
 | Agreement with NLCD 2022 on the demo chunks | MOP | not measured | [1.5](#t-1-5) |
 | Share of polygons with a prompt code | TPM | not measured (target ≥ 90 % by 2026-11-25) | [1.3](#t-1-3) |
+| Gap-fill share of the area, pooled on land chunks | TPM | not measured (target ≤ 0.10) | [1.6](#t-1-6) |
+| Vote-pure share of the land area | TPM | not measured (target ≥ 0.70) | [1.6](#t-1-6) |
 | Level-1 accuracy of the classifier (cross-validated) | TPM | not measured (target ≥ 85 % by 2026-12-15) | [4.3](#t-4-3) |
-| Open RTM rows | TPM | 13 of 20 open (2026-11-11) | section 1 |
+| Open RTM rows | TPM | 14 of 21 open (2026-11-11) | section 1 |
 
 Arithmetic: 20 × 16 = 320, + 80 = 400; 40 × 16 = 640, + 200 = 840. Cells: 15,673 ac / 0.2224 ac
 (one 30 m cell) = 70,474; 30,608 ac / 0.2224 ac = 137,629. n for 77: 384.16 / (1 + 383.16 /
@@ -1512,7 +1560,7 @@ action, a RAID Risk row, a CAUTION, and a test. Run `render_ipo.py ... --pareto`
 | FM-7 | 2.1/p1 | an API call works without a token | a person on the internet changes labels | a route without the auth check | none | 8 | 3 | 4 | 96 | Prevent: one auth wrapper for all routes; Detect: `test_api_needs_token`; R11 |
 | FM-8 | 2.3/p1 | a label save fails with no message | a person's work is lost | SQLite lock, server stop | none | 7 | 3 | 3 | 63 | Prevent: one transaction for each save, WAL, nightly export; Detect: `test_label_survives_restart`; R12 |
 | FM-9 | 5.3/p1 | the estimator reads map votes or training labels | circular accuracy | a query without the mode filter | none | 8 | 3 | 4 | 96 | Prevent: the estimator reads only mode `eval`; Detect: `test_only_eval_labels`; R19 |
-| FM-10 | 1.4/p1 | shares do not sum to 1 | wrong composition and area | overlapped SAM masks | none | 6 | 6 | 3 | 108 | Prevent: one code for each pixel before the shares; Detect: `test_shares_sum_to_one`; R7 |
+| FM-10 | 1.4/p1 | shares do not sum to 1 | wrong composition and area | overlapped SAM masks | none | 6 | 2 | 3 | 36 | Prevent: one code for each pixel before the shares; Detect: `test_shares_sum_to_one`; R7 (O 6 to 2 after 1.6, D63) |
 | FM-11 | 4.1/p1 | the fetch writes or deletes a file under `fine_grid_test` | the `fine_grid` data changes | no read-only check | none | 8 | 2 | 3 | 48 | Prevent: read-only roots in `storage.py`; Detect: `test_skips_existing_and_readonly`; R16 |
 | FM-12 | 1.4/p3 | the history uses the wrong layer or year | a wrong past in the cell record | file name pattern | none | 5 | 3 | 4 | 60 | Detect: `test_record_schema` checks 41 years and the layer names |
 | FM-13 | 3.2/p2 | a chart colour or legend does not match the code | Jack misreads the composition | colours out of the code table | none | 5 | 3 | 5 | 75 | Prevent: colours only from `standard.py` (DS-13) |
@@ -1599,6 +1647,14 @@ action, a RAID Risk row, a CAUTION, and a test. Run `render_ipo.py ... --pareto`
 | FM-94 | 1.3/p1 | The prompt model `predict` returns None, and `prompt_unions` fails on the result | The label run fails on the chunk with an unclear error | `prompt_unions` expects a mask array | Closed 2026-11-11: a None result gives an empty union (no mask) | 4 | 2 | 2 | 16 | Closed; Detect: `test_edge_prompt_model_returning_none_is_a_clean_result` |
 | FM-95 | 1.3/b | A NAIP tag `years` outside 2003 to 2030 (for example 0022 or 9999) is taken as the year of the chunk | `naip_year` in the output is wrong | `chunk_naip_year` accepts any four digits | Closed 2026-11-11: `chunk_naip_year` raises ValueError outside `NAIP_YEARS` (2003, 2030) | 4 | 2 | 2 | 16 | Closed; Detect: `test_edge_d57_year_outside_the_naip_range_is_refused` |
 | FM-96 | 1.3 | A key in the `label` section of the config that is not known (for example a typo) is ignored, so a default runs | The run uses a value that the user did not set | `label_settings` does not check the key names | Closed 2026-11-11: `label_settings` raises ValueError for an unknown key | 4 | 2 | 2 | 16 | Closed; Detect: `test_edge_label_config_unknown_key_is_refused` |
+| FM-97 | 1.6/p1 | overlap ties depend on the order of the masks | the polygon that owns a pixel changes between runs | the sort key has no full order | shuffle test | 5 | 4 | 3 | 60 | Prevent: key score, smaller area, index (D61); Detect: the shuffle-invariance test |
+| FM-98 | 1.6/p1 | gap fill makes giant mixed segments | one polygon has several classes; the vote and the labels are wrong | all gaps join a neighbour | none | 7 | 6 | 4 | 168 | Prevent: a gap of 400 px or more is its own segment (D62), option `gap_split`; Detect: the gap-fill share and the polygon-size MOPs |
+| FM-99 | 1.6/p1 | a simplify or a minimum area for each polygon opens gaps and overlaps again | coverage below 0.999 or overlap above 0 | `masks_to_polygons` works on one polygon | none | 7 | 7 | 3 | 147 | Prevent: `labels_to_polygons` = one `shapes` call (D63); Detect: the round-trip test and `test_coverage_one_overlap_zero` |
+| FM-100 | 1.6/p1 | tile seams cut or duplicate objects | broken or double polygons at the seams | the tiles end inside an object | none | 5 | 6 | 4 | 120 | Prevent: stride 448 and a 20 px inner-edge filter (D64); Detect: the edge-filter test and the seam metric |
+| FM-101 | 1.6/p1 | a dense config uses all memory or hurts the vLLM server | the run or the vLLM server dies | pps 64 and tiles hold many masks | D47 check | 8 | 3 | 3 | 72 | Prevent: the D47 memory check for each chunk, masks as box crops; Detect: the peak-memory metric |
+| FM-102 | 1.6/p1 | tuning to the map vote makes the map the truth (D8) | the polygons copy the 30 m map; the method has no new information | one metric rules the pick | none | 6 | 5 | 6 | 180 | Prevent: several criteria, a size limit, Jack sees the pictures (D65); Detect: the straddle share |
+| FM-103 | 1.6/p1 | `semseg.tune` writes polygon files or `config.yaml` | a tuning run changes data or settings | a write path in the harness | none | 6 | 2 | 3 | 36 | Detect: the write test (only `tune.json` and `summary.csv`) |
+| FM-104 | 1.6/p1 | a test loads the real SAM 2 | a GPU run starts against D22; vLLM can die (FM-72) | `GUARDED` misses `SAM2AutomaticMaskGenerator` | FM-71 guard | 8 | 2 | 2 | 32 | Prevent: add `sam2.automatic_mask_generator.SAM2AutomaticMaskGenerator` to `GUARDED`; Detect: the guard test |
 
 FTA for the worst result (FM-3 and FM-4 have S ≥ 9):
 

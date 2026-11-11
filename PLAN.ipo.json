@@ -317,6 +317,42 @@
     ],
     "edges": "a>p1 b>p1 p1>o1 p1>o2"
   },
+  "1.6": {
+    "titles": {
+      "P": "Process: `semseg.tune`"
+    },
+    "input": [
+      [
+        "a",
+        "NAIP chunks\n12 tune chunks"
+      ],
+      [
+        "b",
+        "SAM 2 weights\n(`HF_HOME` on the share)"
+      ],
+      [
+        "c",
+        "`nlcd_2022`, `classf_2022`\n(vote)"
+      ]
+    ],
+    "process": [
+      [
+        "p1",
+        "tiles 1024 / 448 → SAM 2 masks (C0 to C10)\n→ post-process → label raster → polygons\n→ MOPs and pick rule"
+      ]
+    ],
+    "output": [
+      [
+        "o1",
+        "`runs/<run_id>/tune.json`"
+      ],
+      [
+        "o2",
+        "`results/tune/summary.csv`"
+      ]
+    ],
+    "edges": "a>p1 b>p1 c>p1 p1>o1 p1>o2"
+  },
   "1.3": {
     "input": [
       [
