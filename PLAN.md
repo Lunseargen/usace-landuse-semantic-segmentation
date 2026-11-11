@@ -448,7 +448,7 @@ flowchart LR
 
   </details>
 
-  Code and fake-model tests done (2026-11-11, commit 2a8995c and the 1.3 fix commit). The real LangSAM run waits for Jack (D22).
+  Code and fake-model tests done (2026-11-11, commits 2a8995c and fcbb77e). The real LangSAM run waits for Jack (D22).
 
 <a id="t-1-4"></a>
 > **CAUTION:** SAM masks overlap. Shares from overlapped masks do not sum to 1 (FM-10). Rasterise with one code for each pixel before the shares.
